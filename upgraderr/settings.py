@@ -11,7 +11,8 @@ class Settings(BaseSettings):
     radarr_url: HttpUrl | None
     radarr_api_key: str | None
 
-    data_directory: DirectoryPath = "/data"
+    max_search_limit: int = 20
+    data_directory: DirectoryPath = "./"  # type: ignore
 
 
-settings = Settings()
+settings = Settings()  # type: ignore
