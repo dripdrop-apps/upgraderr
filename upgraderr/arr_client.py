@@ -32,6 +32,13 @@ class QualityProfileModel(BaseModel):
     id: int
 
 
+class CommandModel(BaseModel):
+    queued: datetime
+    started: datetime
+    ended: datetime | None = None
+    id: int
+
+
 class SeriesModel(BaseModel):
     title: str
     monitored: bool
@@ -40,6 +47,7 @@ class SeriesModel(BaseModel):
 
 
 class EpisodeModel(BaseModel):
+    tvdbId: int
     seriesId: int
     seasonNumber: int
     episodeNumber: int
@@ -62,9 +70,7 @@ class SonarrClient(ArrClient):
             api_key=settings.sonarr_api_key,
         )
 
-    def get_quality_profile_custom_format_score(
-        self, quality_profile_id: int
-    ) -> int | None:
+    def get_quality_profile_custom_format_score(self, quality_profile_id: int):
         response = self.get("/api/v3/qualityprofile")
         quality_profiles = [
             QualityProfileModel.model_validate(_) for _ in response.json()
@@ -100,8 +106,30 @@ class SonarrClient(ArrClient):
         response = self.get("/api/v3/episode", params={"seriesId": series_id})
         return [EpisodeModel.model_validate(_) for _ in response.json()]
 
+    def search_season(self, series_id: int, seasonNumber: int):
+        response = self.get(
+            "/api/v3/command",
+            data={
+                "name": "SeasonSearch",
+                "seasonNumber": seasonNumber,
+                "seriesId": series_id,
+            },
+        )
+        return CommandModel.model_validate(response.json())
+
+    def search_episodes(self, episode_ids: list[int]):
+        response = self.get(
+            "/api/v3/command", data={"name": "EpisodeSearch", "episodeIds": episode_ids}
+        )
+        return CommandModel.model_validate(response.json())
+
+    def get_command(self, command_id: int):
+        response = self.get(f"/api/v3/command/{command_id}")
+        return CommandModel.model_validate(response.json())
+
 
 class MovieModel(BaseModel):
+    tmdbId: int
     qualityProfileId: int
     hasFile: bool
     monitored: bool
@@ -151,3 +179,13 @@ class RadarrClient(ArrClient):
     def get_all_movies(self):
         response = self.get("/api/v3/movie")
         return [MovieModel.model_validate(_) for _ in response.json()]
+
+    def search_movie(self, movie_ids: list[int]):
+        response = self.post(
+            "/api/v3/command", data={"name": "MoviesSearch", "movieIds": movie_ids}
+        )
+        return CommandModel.model_validate(response.json())
+
+    def get_command(self, command_id: int):
+        response = self.get(f"/api/v3/command/{command_id}")
+        return CommandModel.model_validate(response.json())
