@@ -47,8 +47,8 @@ class Movie(Base):
         "MovieCommand", back_populates="movie"
     )
 
-    def __init__(self, id: int, **kw):
-        super().__init__(id=id, **kw)
+    def __init__(self, id: int, radarr_id: int, **kw):
+        super().__init__(id=id, radarr_id=radarr_id, **kw)
 
 
 class MovieCommand(Base):
@@ -64,7 +64,7 @@ class MovieCommand(Base):
         )
     )
     reason: Mapped[str] = mapped_column(nullable=False)
-    queued: Mapped[datetime | None] = mapped_column(nullable=True)
+    queued: Mapped[datetime | None] = mapped_column(nullable=False)
     started: Mapped[datetime | None] = mapped_column(nullable=True)
     ended: Mapped[datetime | None] = mapped_column(nullable=True)
 
@@ -95,9 +95,10 @@ class Episode(Base):
     __tablename__ = "episodes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    episode_number: Mapped[int] = mapped_column(primary_key=True)
-    season_number: Mapped[int] = mapped_column(primary_key=True)
-    series_id: Mapped[int] = mapped_column(primary_key=True)
+    episode_id: Mapped[int] = mapped_column(nullable=False)
+    episode_number: Mapped[int] = mapped_column(nullable=False)
+    season_number: Mapped[int] = mapped_column(nullable=False)
+    series_id: Mapped[int] = mapped_column(nullable=False)
 
     commands: Mapped[list["EpisodeCommand"]] = relationship(
         "EpisodeCommands", back_populates="episode"
@@ -133,7 +134,7 @@ class EpisodeCommand(Base):
         )
     )
     reason: Mapped[str] = mapped_column(nullable=False)
-    queued: Mapped[datetime | None] = mapped_column(nullable=True)
+    queued: Mapped[datetime | None] = mapped_column(nullable=False)
     started: Mapped[datetime | None] = mapped_column(nullable=True)
     ended: Mapped[datetime | None] = mapped_column(nullable=True)
 

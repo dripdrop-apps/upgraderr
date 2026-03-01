@@ -1,8 +1,8 @@
 """initialize
 
-Revision ID: 7ab3ae647632
+Revision ID: dfe39ae74442
 Revises:
-Create Date: 2026-03-01 16:40:22.247780
+Create Date: 2026-03-01 17:04:11.364715
 
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "7ab3ae647632"
+revision: str = "dfe39ae74442"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -24,12 +24,13 @@ def upgrade() -> None:
     op.create_table(
         "episodes",
         sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("episode_id", sa.Integer(), nullable=False),
         sa.Column("episode_number", sa.Integer(), nullable=False),
         sa.Column("season_number", sa.Integer(), nullable=False),
         sa.Column("series_id", sa.Integer(), nullable=False),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("modified_at", sa.TIMESTAMP(timezone=True), nullable=True),
-        sa.PrimaryKeyConstraint("id", "episode_number", "season_number", "series_id"),
+        sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(
         "movies",
@@ -44,7 +45,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("episode_id", sa.Integer(), nullable=False),
         sa.Column("reason", sa.String(), nullable=False),
-        sa.Column("queued", sa.DateTime(), nullable=True),
+        sa.Column("queued", sa.DateTime(), nullable=False),
         sa.Column("started", sa.DateTime(), nullable=True),
         sa.Column("ended", sa.DateTime(), nullable=True),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False),
@@ -63,7 +64,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("movie_id", sa.Integer(), nullable=False),
         sa.Column("reason", sa.String(), nullable=False),
-        sa.Column("queued", sa.DateTime(), nullable=True),
+        sa.Column("queued", sa.DateTime(), nullable=False),
         sa.Column("started", sa.DateTime(), nullable=True),
         sa.Column("ended", sa.DateTime(), nullable=True),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False),
