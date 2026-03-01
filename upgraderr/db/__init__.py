@@ -1,14 +1,8 @@
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
-from sqlalchemy import TIMESTAMP, create_engine, ForeignKey
-from sqlalchemy.orm import (
-    DeclarativeBase,
-    Mapped,
-    mapped_column,
-    sessionmaker,
-    relationship,
-)
+from sqlalchemy import TIMESTAMP, create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from upgraderr.settings import settings
 
@@ -42,53 +36,12 @@ class Movie(Base):
     # Refers to the tmdb id
     id: Mapped[int] = mapped_column(primary_key=True)
     radarr_id: Mapped[int] = mapped_column(nullable=False)
-
-    commands: Mapped[list["MovieCommand"]] = relationship(
-        "MovieCommand", back_populates="movie"
-    )
-
-    def __init__(self, id: int, radarr_id: int, **kw):
-        super().__init__(id=id, radarr_id=radarr_id, **kw)
-
-
-class MovieCommand(Base):
-    __tablename__ = "movie_commands"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    movie_id: Mapped[int] = mapped_column(
-        ForeignKey(
-            Movie.id,
-            onupdate="CASCADE",
-            ondelete="CASCADE",
-            name="movie_commands_movie_id_fkey",
-        )
-    )
-    reason: Mapped[str] = mapped_column(nullable=False)
-    queued: Mapped[datetime | None] = mapped_column(nullable=False)
-    started: Mapped[datetime | None] = mapped_column(nullable=True)
-    ended: Mapped[datetime | None] = mapped_column(nullable=True)
-
-    movie: Mapped[Movie] = relationship(Movie, back_populates="commands")
+    last_searched: Mapped[datetime | None] = mapped_column(nullable=True)
 
     def __init__(
-        self,
-        id: int,
-        movie_id: int,
-        reason: str,
-        queued: datetime | None = None,
-        started: datetime | None = None,
-        ended: datetime | None = None,
-        **kw,
+        self, id: int, radarr_id: int, last_searched: datetime | None = None, **kw
     ):
-        super().__init__(
-            id=id,
-            movie_id=movie_id,
-            reason=reason,
-            queued=queued,
-            started=started,
-            ended=ended,
-            **kw,
-        )
+        super().__init__(id=id, radarr_id=radarr_id, last_searched=last_searched, **kw)
 
 
 class Episode(Base):
@@ -99,10 +52,7 @@ class Episode(Base):
     episode_number: Mapped[int] = mapped_column(nullable=False)
     season_number: Mapped[int] = mapped_column(nullable=False)
     series_id: Mapped[int] = mapped_column(nullable=False)
-
-    commands: Mapped[list["EpisodeCommand"]] = relationship(
-        "EpisodeCommands", back_populates="episode"
-    )
+    last_searched: Mapped[datetime | None] = mapped_column(nullable=True)
 
     def __init__(
         self,
@@ -110,6 +60,7 @@ class Episode(Base):
         episode_number: int,
         season_number: int,
         series_id: int,
+        last_searched: datetime | None = None,
         **kw,
     ):
         super().__init__(
@@ -117,45 +68,6 @@ class Episode(Base):
             episode_number=episode_number,
             season_number=season_number,
             series_id=series_id,
-            **kw,
-        )
-
-
-class EpisodeCommand(Base):
-    __tablename__ = "episode_commands"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    episode_id: Mapped[int] = mapped_column(
-        ForeignKey(
-            Episode.id,
-            onupdate="CASCADE",
-            ondelete="CASCADE",
-            name="episode_commands_episode_id_fkey",
-        )
-    )
-    reason: Mapped[str] = mapped_column(nullable=False)
-    queued: Mapped[datetime | None] = mapped_column(nullable=False)
-    started: Mapped[datetime | None] = mapped_column(nullable=True)
-    ended: Mapped[datetime | None] = mapped_column(nullable=True)
-
-    episode: Mapped[Episode] = relationship(Episode, back_populates="commands")
-
-    def __init__(
-        self,
-        id: int,
-        episode_id: int,
-        reason: str,
-        queued: datetime | None = None,
-        started: datetime | None = None,
-        ended: datetime | None = None,
-        **kw,
-    ):
-        super().__init__(
-            id=id,
-            episode_id=episode_id,
-            reason=reason,
-            queued=queued,
-            started=started,
-            ended=ended,
+            last_searched=last_searched,
             **kw,
         )

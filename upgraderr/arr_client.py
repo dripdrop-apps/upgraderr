@@ -32,13 +32,6 @@ class QualityProfileModel(BaseModel):
     id: int
 
 
-class CommandModel(BaseModel):
-    queued: datetime
-    started: datetime
-    ended: datetime | None = None
-    id: int
-
-
 class SeriesModel(BaseModel):
     title: str
     monitored: bool
@@ -106,27 +99,6 @@ class SonarrClient(ArrClient):
         response = self.get("/api/v3/episode", params={"seriesId": series_id})
         return [EpisodeModel.model_validate(_) for _ in response.json()]
 
-    def search_season(self, series_id: int, seasonNumber: int):
-        response = self.get(
-            "/api/v3/command",
-            data={
-                "name": "SeasonSearch",
-                "seasonNumber": seasonNumber,
-                "seriesId": series_id,
-            },
-        )
-        return CommandModel.model_validate(response.json())
-
-    def search_episodes(self, episode_ids: list[int]):
-        response = self.get(
-            "/api/v3/command", data={"name": "EpisodeSearch", "episodeIds": episode_ids}
-        )
-        return CommandModel.model_validate(response.json())
-
-    def get_command(self, command_id: int):
-        response = self.get(f"/api/v3/command/{command_id}")
-        return CommandModel.model_validate(response.json())
-
 
 class MovieModel(BaseModel):
     tmdbId: int
@@ -179,13 +151,3 @@ class RadarrClient(ArrClient):
     def get_all_movies(self):
         response = self.get("/api/v3/movie")
         return [MovieModel.model_validate(_) for _ in response.json()]
-
-    def search_movie(self, movie_ids: list[int]):
-        response = self.post(
-            "/api/v3/command", data={"name": "MoviesSearch", "movieIds": movie_ids}
-        )
-        return CommandModel.model_validate(response.json())
-
-    def get_command(self, command_id: int):
-        response = self.get(f"/api/v3/command/{command_id}")
-        return CommandModel.model_validate(response.json())
