@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     radarr_api_key: str | None
 
     max_search_limit: int = 20
+    search_interval: int = 24  # 24 hours
     data_directory: DirectoryPath = "./"  # type: ignore
 
 
