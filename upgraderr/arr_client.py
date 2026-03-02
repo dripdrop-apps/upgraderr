@@ -99,6 +99,21 @@ class SonarrClient(ArrClient):
         response = self.get("/api/v3/episode", params={"seriesId": series_id})
         return [EpisodeModel.model_validate(_) for _ in response.json()]
 
+    def search_season(self, series_id: int, seasonNumber: int):
+        self.get(
+            "/api/v3/command",
+            data={
+                "name": "SeasonSearch",
+                "seasonNumber": seasonNumber,
+                "seriesId": series_id,
+            },
+        )
+
+    def search_episodes(self, episode_ids: list[int]):
+        self.get(
+            "/api/v3/command", data={"name": "EpisodeSearch", "episodeIds": episode_ids}
+        )
+
 
 class MovieModel(BaseModel):
     tmdbId: int
@@ -151,3 +166,8 @@ class RadarrClient(ArrClient):
     def get_all_movies(self):
         response = self.get("/api/v3/movie")
         return [MovieModel.model_validate(_) for _ in response.json()]
+
+    def search_movie(self, movie_ids: list[int]):
+        self.post(
+            "/api/v3/command", data={"name": "MoviesSearch", "movieIds": movie_ids}
+        )
