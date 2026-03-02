@@ -1,5 +1,10 @@
 import logging
-from upgraderr import arr_client, db
+from datetime import timedelta, datetime
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from upgraderr import arr_client
+from upgraderr.db import Movie, Episode, get_db_session
+from upgraderr.settings import settings
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -10,9 +15,13 @@ class Upgraderr:
         self.sonarr = arr_client.SonarrClient.initialize()
         self.radarr = arr_client.RadarrClient.initialize()
 
-    def _get_movie_search_reason(self, movie: arr_client.MovieModel):
+    def _can_movie_be_searched(self, movie: arr_client.MovieModel):
         if not self.radarr:
-            return None
+            logging.info("Radarr is not configured. Skipping...")
+            return False
+        elif not movie.monitored:
+            logger.debug(f"Skipping unmonitored movie ({movie.title})")
+            return False
 
         movie_custom_format_score = self.radarr.get_movie_custom_format_score(
             movie_id=movie.id
@@ -20,39 +29,44 @@ class Upgraderr:
         profile_max_custom_score = self.radarr.get_quality_profile_custom_format_score(
             quality_profile_id=movie.qualityProfileId
         )
+
         movie_can_be_upgraded = (
-            movie.monitored
-            and isinstance(movie_custom_format_score, int)
+            isinstance(movie_custom_format_score, int)
             and isinstance(profile_max_custom_score, int)
             and movie_custom_format_score < profile_max_custom_score
         )
         if movie_can_be_upgraded:
-            return "Can be upgraded"
+            logger.info(f"Movie ({movie.title}) can be upgraded. Queueing search...")
+            logger.debug(
+                f"Current score: {movie_custom_format_score}, Max score: {profile_max_custom_score}"
+            )
         if not movie.hasFile:
-            return "Missing file"
-        return None
+            logger.info(
+                f"Movie ({movie.title}) does not have a file. Queueing search..."
+            )
+        return movie_can_be_upgraded or not movie.hasFile
 
-    def _sync_movies(self):
+    def _sync_movies(self, session: Session):
         if not self.radarr:
             logging.info("Radarr is not configured. Skipping...")
             return
 
-        with db.get_session() as session:
-            movies = self.radarr.get_all_movies()
-            for movie in movies:
-                obj = db.Movie(
-                    id=movie.id,
-                    search_reason=self._get_movie_search_reason(movie=movie),
-                    last_searched=movie.lastSearchTime,
-                )
-                session.merge(obj)
-                session.commit()
+        movies = self.radarr.get_all_movies()
+        for movie in movies:
+            obj = Movie(tmdb_id=movie.tmdbId, movie_id=movie.id)
+            session.merge(obj)
+            session.commit()
 
-    def _get_episode_search_reason(
+    def _can_episode_be_searched(
         self, series: arr_client.SeriesModel, episode: arr_client.EpisodeModel
     ):
         if not self.sonarr:
-            return
+            return False
+        elif not episode.monitored:
+            logger.debug(
+                f"Skipping unmonitored episode ({series.title} - {episode.title})"
+            )
+            return False
 
         episode_custom_format_score = self.sonarr.get_episode_custom_format_score(
             episode_id=episode.id, series_id=episode.seriesId
@@ -63,45 +77,112 @@ class Upgraderr:
             )
         )
         episode_can_be_upgraded = (
-            episode.monitored
-            and isinstance(episode_custom_format_score, int)
+            isinstance(episode_custom_format_score, int)
             and isinstance(profile_max_custom_format_score, int)
             and episode_custom_format_score < profile_max_custom_format_score
         )
         if episode_can_be_upgraded:
-            return "Can be upgraded"
+            logging.info(
+                f"Episode ({series.title} - {episode.title}) can be upgraded. Queueing search..."
+            )
+            logging.debug(
+                f"Current Score {episode_custom_format_score}, Max Score {profile_max_custom_format_score}"
+            )
         if not episode.hasFile:
-            return "Missing file"
-        return None
+            logging.info(
+                f"Episode ({series.title} - {episode.title}) has no file. Queueing search..."
+            )
+        return episode_can_be_upgraded or not episode.hasFile
 
-    def _sync_episodes(self):
+    def _sync_episodes(self, session: Session):
         if not self.sonarr:
             logger.info("Sonarr is not configured. Skipping...")
             return
 
-        with db.get_session() as session:
-            all_series = self.sonarr.get_all_series()
-            for series in all_series:
-                series_id = series.id
-                episodes = self.sonarr.get_all_episodes(series_id=series_id)
-                for episode in episodes:
-                    obj = db.Episode(
-                        episode_number=episode.episodeNumber,
-                        season_number=episode.seasonNumber,
-                        series_id=series_id,
-                        search_reason=self._get_episode_search_reason(
-                            series=series, episode=episode
-                        ),
-                        last_searched=episode.lastSearchTime,
-                    )
-                    session.merge(obj)
-                    session.commit()
+        all_series = self.sonarr.get_all_series()
+        for series in all_series:
+            series_id = series.id
+            episodes = self.sonarr.get_all_episodes(series_id=series_id)
+            for episode in episodes:
+                obj = Episode(
+                    tvdb_id=episode.tvdbId,
+                    episode_id=episode.id,
+                    episode_number=episode.episodeNumber,
+                    season_number=episode.seasonNumber,
+                    series_id=series_id,
+                )
+                session.merge(obj)
+                session.commit()
 
     def sync(self):
         logger.info("Starting media sync...")
-        self._sync_movies()
-        self._sync_episodes()
+        with get_db_session() as session:
+            self._sync_movies(session=session)
+            self._sync_episodes(session=session)
         logger.info("Media sync completed.")
 
+    def _schedule_movie_searches(self, session: Session):
+        if not self.radarr:
+            logging.info("Radarr is not configured. Skipping...")
+            return
+
+        movies_to_search = set()
+
+        query = select(Movie).where(
+            Movie.job_id.is_(None),
+            Movie.last_searched
+            < datetime.now() - timedelta(hours=settings.search_interval),
+        )
+        movies = session.scalars(query)
+        for movie in movies:
+            all_movies = self.radarr.get_all_movies()
+            matching_movie = next(
+                (m for m in all_movies if m.tmdbId == movie.tmdb_id), None
+            )
+            if matching_movie and self._can_movie_be_searched(matching_movie):
+                movies_to_search.add(matching_movie.id)
+
+        # Logic to queue searches
+
+        return movies_to_search
+
+    def _schedule_series_searches(self, session: Session):
+        if not self.sonarr:
+            logger.info("Sonarr is not configured. Skipping...")
+            return
+
+        series_to_search = set()
+
+        query = select(Episode).where(
+            Episode.job_id.is_(None),
+            Episode.last_searched
+            < datetime.now() - timedelta(hours=settings.search_interval),
+        )
+        episodes = session.scalars(query)
+        for episode in episodes:
+            all_series = self.sonarr.get_all_series()
+            matching_series = next((s for s in all_series if s.id == episode.series_id))
+            if matching_series:
+                all_episodes = self.sonarr.get_all_episodes(series_id=episode.series_id)
+                matching_episode = next(
+                    (e for e in all_episodes if e.tvdbId == episode.tvdb_id), None
+                )
+                if matching_episode and self._can_episode_be_searched(
+                    series=matching_series, episode=matching_episode
+                ):
+                    series_to_search.add(matching_series.id)
+
+        # Add logic to queue searches
+
+        return series_to_search
+
     def upgrade(self):
-        pass
+        logger.info("Starting media upgrade...")
+        with get_db_session() as session:
+            self._schedule_movie_searches(session=session)
+            self._schedule_series_searches(session=session)
+        logger.info("Media upgrade completed.")
+
+    def run(self):
+        self.sync()
+        self.upgrade()
