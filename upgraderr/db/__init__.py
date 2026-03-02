@@ -34,20 +34,22 @@ class Movie(Base):
     __tablename__ = "movies"
 
     # Refers to the tmdb id
-    id: Mapped[int] = mapped_column(primary_key=True)
-    radarr_id: Mapped[int] = mapped_column(nullable=False)
+    tmdb_id: Mapped[int] = mapped_column(primary_key=True)
+    movie_id: Mapped[int] = mapped_column(nullable=False)
     last_searched: Mapped[datetime | None] = mapped_column(nullable=True)
 
     def __init__(
-        self, id: int, radarr_id: int, last_searched: datetime | None = None, **kw
+        self, tmdb_id: int, movie_id: int, last_searched: datetime | None = None, **kw
     ):
-        super().__init__(id=id, radarr_id=radarr_id, last_searched=last_searched, **kw)
+        super().__init__(
+            tmdb_id=tmdb_id, movie_id=movie_id, last_searched=last_searched, **kw
+        )
 
 
 class Episode(Base):
     __tablename__ = "episodes"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    tvdb_id: Mapped[int] = mapped_column(primary_key=True)
     episode_id: Mapped[int] = mapped_column(nullable=False)
     episode_number: Mapped[int] = mapped_column(nullable=False)
     season_number: Mapped[int] = mapped_column(nullable=False)
@@ -56,7 +58,8 @@ class Episode(Base):
 
     def __init__(
         self,
-        id: int,
+        tvdb_id: int,
+        episode_id: int,
         episode_number: int,
         season_number: int,
         series_id: int,
@@ -64,7 +67,8 @@ class Episode(Base):
         **kw,
     ):
         super().__init__(
-            id=id,
+            tvdb_id=tvdb_id,
+            episode_id=episode_id,
             episode_number=episode_number,
             season_number=season_number,
             series_id=series_id,
