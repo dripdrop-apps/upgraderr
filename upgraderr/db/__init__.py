@@ -39,22 +39,6 @@ class Movie(Base):
     job_id: Mapped[str | None] = mapped_column(nullable=True)
     last_searched: Mapped[datetime | None] = mapped_column(nullable=True)
 
-    def __init__(
-        self,
-        tmdb_id: int,
-        movie_id: int,
-        job_id: str | None = None,
-        last_searched: datetime | None = None,
-        **kw,
-    ):
-        super().__init__(
-            tmdb_id=tmdb_id,
-            movie_id=movie_id,
-            job_id=job_id,
-            last_searched=last_searched,
-            **kw,
-        )
-
 
 class Episode(Base):
     __tablename__ = "episodes"
@@ -66,25 +50,3 @@ class Episode(Base):
     series_id: Mapped[int] = mapped_column(nullable=False)
     job_id: Mapped[str | None] = mapped_column(nullable=True)
     last_searched: Mapped[datetime | None] = mapped_column(nullable=True)
-
-    def __init__(
-        self,
-        tvdb_id: int,
-        episode_id: int,
-        episode_number: int,
-        season_number: int,
-        series_id: int,
-        job_id: str | None = None,
-        last_searched: datetime | None = None,
-        **kw,
-    ):
-        super().__init__(
-            tvdb_id=tvdb_id,
-            episode_id=episode_id,
-            episode_number=episode_number,
-            season_number=season_number,
-            series_id=series_id,
-            job_id=job_id,
-            last_searched=last_searched,
-            **kw,
-        )
