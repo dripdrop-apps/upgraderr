@@ -158,13 +158,8 @@ class RadarrClient(ArrClient):
     def get_movie_custom_format_score(self, movie_id: int):
         response = self.get("/api/v3/movieFile", params={"movieId": movie_id})
         movie_files = [MovieFileModel.model_validate(_) for _ in response.json()]
-        return next(
-            (
-                movie_file.customFormatScore
-                for movie_file in movie_files
-                if movie_file.id == movie_id
-            ),
-            None,
+        return max(
+            (movie_file.customFormatScore for movie_file in movie_files), default=None
         )
 
     @lru_cache()
