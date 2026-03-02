@@ -1,6 +1,6 @@
 import logging
 from datetime import timedelta, datetime
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.orm import Session
 from upgraderr import arr_client
 from upgraderr.db import Movie, Episode, get_db_session
@@ -31,7 +31,8 @@ class Upgraderr:
         )
 
         movie_can_be_upgraded = (
-            isinstance(movie_custom_format_score, int)
+            movie.hasFile
+            and isinstance(movie_custom_format_score, int)
             and isinstance(profile_max_custom_score, int)
             and movie_custom_format_score < profile_max_custom_score
         )
@@ -77,7 +78,8 @@ class Upgraderr:
             )
         )
         episode_can_be_upgraded = (
-            isinstance(episode_custom_format_score, int)
+            episode.hasFile
+            and isinstance(episode_custom_format_score, int)
             and isinstance(profile_max_custom_format_score, int)
             and episode_custom_format_score < profile_max_custom_format_score
         )
@@ -130,10 +132,13 @@ class Upgraderr:
 
         query = select(Movie).where(
             Movie.job_id.is_(None),
-            Movie.last_searched
-            < datetime.now() - timedelta(hours=settings.search_interval),
+            or_(
+                Movie.last_searched
+                < (datetime.now() - timedelta(hours=settings.search_interval)),
+                Movie.last_searched.is_(None),
+            ),
         )
-        movies = session.scalars(query)
+        movies = session.scalars(query).all()
         for movie in movies:
             all_movies = self.radarr.get_all_movies()
             matching_movie = next(
@@ -155,10 +160,13 @@ class Upgraderr:
 
         query = select(Episode).where(
             Episode.job_id.is_(None),
-            Episode.last_searched
-            < datetime.now() - timedelta(hours=settings.search_interval),
+            or_(
+                Episode.last_searched
+                < (datetime.now() - timedelta(hours=settings.search_interval)),
+                Episode.last_searched.is_(None),
+            ),
         )
-        episodes = session.scalars(query)
+        episodes = session.scalars(query).all()
         for episode in episodes:
             all_series = self.sonarr.get_all_series()
             matching_series = next((s for s in all_series if s.id == episode.series_id))
@@ -176,13 +184,9 @@ class Upgraderr:
 
         return series_to_search
 
-    def upgrade(self):
-        logger.info("Starting media upgrade...")
+    def schedule(self):
+        logger.info("Starting media search scheduling...")
         with get_db_session() as session:
             self._schedule_movie_searches(session=session)
             self._schedule_series_searches(session=session)
-        logger.info("Media upgrade completed.")
-
-    def run(self):
-        self.sync()
-        self.upgrade()
+        logger.info("Media scheduling completed.")
