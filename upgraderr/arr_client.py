@@ -47,6 +47,7 @@ class EpisodeModel(BaseModel):
     hasFile: bool
     monitored: bool
     lastSearchTime: datetime | None = None
+    title: str
     id: int
 
 
@@ -77,7 +78,7 @@ class SonarrClient(ArrClient):
             None,
         )
 
-    @lru_cache(maxsize=10)
+    @lru_cache()
     def get_episode_files(self, series_id: str):
         response = self.get(
             "/api/v3/episodeFile",
@@ -91,10 +92,12 @@ class SonarrClient(ArrClient):
             (ef.customFormatScore for ef in episode_files if ef.id == episode_id), None
         )
 
+    @lru_cache()
     def get_all_series(self):
         response = self.get("/api/v3/series")
         return [SeriesModel.model_validate(_) for _ in response.json()]
 
+    @lru_cache()
     def get_all_episodes(self, series_id: int):
         response = self.get("/api/v3/episode", params={"seriesId": series_id})
         return [EpisodeModel.model_validate(_) for _ in response.json()]
@@ -121,6 +124,7 @@ class MovieModel(BaseModel):
     hasFile: bool
     monitored: bool
     lastSearchTime: datetime | None = None
+    title: str
     id: int
 
 
@@ -163,6 +167,7 @@ class RadarrClient(ArrClient):
             None,
         )
 
+    @lru_cache()
     def get_all_movies(self):
         response = self.get("/api/v3/movie")
         return [MovieModel.model_validate(_) for _ in response.json()]
