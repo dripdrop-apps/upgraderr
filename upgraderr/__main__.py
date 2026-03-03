@@ -13,7 +13,9 @@ from upgraderr.db import Movie, Episode, get_db_session, engine
 from upgraderr.settings import settings
 
 logging.basicConfig(level=logging.INFO)
+
 logger = logging.getLogger("upgraderr")
+logger.setLevel(level=settings.log_level)
 
 scheduler = BlockingScheduler()
 scheduler.configure(
