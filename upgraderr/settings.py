@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     search_interval: int = 24  # 24 hours
     data_directory: DirectoryPath = "./"  # type: ignore
     dry_run: bool = True
+    log_level: str = "INFO"
 
 
 settings = Settings()  # type: ignore
