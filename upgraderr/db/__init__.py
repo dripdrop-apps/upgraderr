@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from upgraderr.settings import settings
 
 database_url = f"sqlite:///{settings.data_directory}/db.sqlite3"
-engine = create_engine(database_url, echo=True)
+engine = create_engine(database_url)
 session_maker = sessionmaker(engine, expire_on_commit=False)
 
 
