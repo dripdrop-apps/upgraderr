@@ -290,8 +290,12 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "action",
-        choices=["sync", "search"],
-        help="Sync the database with the Sonarr/Radarr instances. Search for new episodes/seasons.",
+        choices=["sync", "search", "run"],
+        help="""
+        Sync the database with the Sonarr/Radarr instances.
+        Search for new episodes/seasons.
+        Run.
+        """,
     )
 
     args = parser.parse_args()
