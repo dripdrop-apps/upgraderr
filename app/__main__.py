@@ -7,9 +7,9 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 from datetime import timedelta, datetime
-from pydantic import BaseModel
 from sqlalchemy import select, or_, update
 from sqlalchemy.orm import Session
+from typing import NamedTuple
 from app import arr_client
 from app.db import Movie, Episode, get_db_session, engine
 from app.settings import settings
@@ -33,7 +33,7 @@ scheduler.configure(
 )
 
 
-class MovieSearch(BaseModel):
+class MovieSearch(NamedTuple):
     movie_id: int
     movie_title: str
 
@@ -41,7 +41,7 @@ class MovieSearch(BaseModel):
         return f"Movie: {self.movie_title}"
 
 
-class SeasonSearch(BaseModel):
+class SeasonSearch(NamedTuple):
     series_id: int
     series_title: str
     season_number: int
