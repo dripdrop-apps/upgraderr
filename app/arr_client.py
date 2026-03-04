@@ -16,7 +16,7 @@ class ArrClient(Generic[T], requests.Session):
             self.headers.update({"X-Api-Key": api_key})
 
     def request(self, method: str, url: str, *args, **kwargs):
-        response = super().request(method, f"{self.base_url}/{url}", *args, **kwargs)
+        response = super().request(method, f"{self.base_url}{url}", *args, **kwargs)
         response.raise_for_status()
         return response
 
@@ -60,7 +60,7 @@ class SonarrClient(ArrClient):
     @classmethod
     def initialize(cls, *args, **kwargs):
         return super().initialize(
-            url=settings.sonarr_url.unicode_string() if settings.sonarr_url else None,
+            url=str(settings.sonarr_url) if settings.sonarr_url else None,
             api_key=settings.sonarr_api_key,
         )
 
@@ -105,7 +105,7 @@ class SonarrClient(ArrClient):
     def search_season(self, series_id: int, season_number: int):
         self.get(
             "/api/v3/command",
-            data={
+            json={
                 "name": "SeasonSearch",
                 "seasonNumber": season_number,
                 "seriesId": series_id,
@@ -114,7 +114,7 @@ class SonarrClient(ArrClient):
 
     def search_episodes(self, episode_ids: list[int]):
         self.get(
-            "/api/v3/command", data={"name": "EpisodeSearch", "episodeIds": episode_ids}
+            "/api/v3/command", json={"name": "EpisodeSearch", "episodeIds": episode_ids}
         )
 
 
@@ -137,7 +137,7 @@ class RadarrClient(ArrClient):
     @classmethod
     def initialize(cls, *args, **kwargs):
         return super().initialize(
-            url=settings.radarr_url.unicode_string() if settings.radarr_url else None,
+            url=str(settings.radarr_url) if settings.radarr_url else None,
             api_key=settings.radarr_api_key,
         )
 
@@ -169,5 +169,5 @@ class RadarrClient(ArrClient):
 
     def search_movie(self, movie_ids: list[int]):
         self.post(
-            "/api/v3/command", data={"name": "MoviesSearch", "movieIds": movie_ids}
+            "/api/v3/command", json={"name": "MoviesSearch", "movieIds": movie_ids}
         )
