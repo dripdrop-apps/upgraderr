@@ -279,7 +279,6 @@ class Upgraderr:
             Upgraderr.search_task,
             trigger=DateTrigger(run_date=datetime.now() + timedelta(minutes=5)),
             id="search",
-            replace_existing=True,
         )
 
     @classmethod
@@ -290,6 +289,8 @@ class Upgraderr:
             id="sync",
             replace_existing=True,
         )
+
+        scheduler.add_job(func=Upgraderr.sync, id="sync")
         scheduler.add_job(
             func=Upgraderr.search_task, id="search", replace_existing=True
         )
