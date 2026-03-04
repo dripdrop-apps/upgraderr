@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     radarr_url: HttpUrl | None
     radarr_api_key: str | None
 
+    one_shot: bool = True
     max_search_limit: int = 20
     search_state_reset: int = 86400  # minutes
     search_interval: int = 5  # minutes

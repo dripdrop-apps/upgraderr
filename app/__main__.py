@@ -288,6 +288,12 @@ class Upgraderr:
 
     @classmethod
     def run(cls):
+        if settings.one_shot:
+            upgraderr = cls()
+            upgraderr.sync()
+            upgraderr.search()
+            return
+
         scheduler.add_job(
             func=Upgraderr.sync,
             trigger=CronTrigger(hour=0, minute=0),
