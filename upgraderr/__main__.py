@@ -30,7 +30,7 @@ class Upgraderr:
         self.radarr = arr_client.RadarrClient.initialize()
         self.dry_run = settings.dry_run
         if self.dry_run:
-            logger.info("DRY RUN: No changes will be made.")
+            logger.info("DRY RUN: No searches will be executed.")
 
     def _can_movie_be_searched(self, movie: arr_client.MovieModel):
         if not self.radarr:
@@ -69,8 +69,6 @@ class Upgraderr:
 
         movies = self.radarr.get_all_movies()
         for movie in movies:
-            if self.dry_run:
-                continue
             obj = Movie(tmdb_id=movie.tmdbId, movie_id=movie.id)
             session.merge(obj)
             session.commit()
@@ -119,8 +117,6 @@ class Upgraderr:
             series_id = series.id
             episodes = self.sonarr.get_all_episodes(series_id=series_id)
             for episode in episodes:
-                if self.dry_run:
-                    continue
                 obj = Episode(
                     tvdb_id=episode.tvdbId,
                     episode_id=episode.id,
