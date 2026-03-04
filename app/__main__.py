@@ -15,7 +15,7 @@ from app.settings import settings
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s -  %(levelname)s - %(message)",
+    format="%(asctime)s - %(name)s -  %(levelname)s - %(message)s",
     handlers=[
         logging.FileHandler(f"{settings.logs_directory}/app.log"),
         logging.StreamHandler(sys.stdout),
