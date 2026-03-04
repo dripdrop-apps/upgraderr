@@ -1,5 +1,6 @@
 import argparse
 import logging
+import logging.handlers
 import random
 import sys
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
@@ -18,7 +19,11 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s -  %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler(f"{settings.logs_directory}/app.log"),
+        logging.handlers.RotatingFileHandler(
+            filename=f"{settings.logs_directory}/upgraderr.log",
+            maxBytes=10 * 1024 * 1024,
+            backupCount=5,
+        ),
         logging.StreamHandler(sys.stdout),
     ],
 )
