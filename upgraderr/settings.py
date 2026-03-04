@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     max_search_limit: int = 20
     search_interval: int = 24  # 24 hours
-    data_directory: DirectoryPath = "./"  # type: ignore
+    data_directory: DirectoryPath = "/data"  # type: ignore
     dry_run: bool = True
     log_level: str = "INFO"
 
