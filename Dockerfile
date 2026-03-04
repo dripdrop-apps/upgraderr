@@ -11,6 +11,8 @@ COPY . .
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/upgraderr && ln -s /app/upgraderr /usr/local/bin/upgraderr
 
-ENTRYPOINT [ "/app/entrypoint.sh" ]
+CMD [ "run" ]
+
+ENTRYPOINT [ "/app/upgraderr" ]
