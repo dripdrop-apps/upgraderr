@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     search_state_reset: int = 86400  # minutes
     search_interval: int = 5  # minutes
     data_directory: DirectoryPath = "/data"  # type: ignore
+    logs_directory: DirectoryPath = "/logs"  # type: ignore
     dry_run: bool = True
     log_level: str = "INFO"
 

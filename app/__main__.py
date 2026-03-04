@@ -1,5 +1,6 @@
 import argparse
 import logging
+import sys
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -12,7 +13,14 @@ from app import arr_client
 from app.db import Movie, Episode, get_db_session, engine
 from app.settings import settings
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s -  %(levelname)s - %(message)",
+    handlers=[
+        logging.FileHandler(f"{settings.logs_directory}/app.log"),
+        logging.StreamHandler(sys.stdout),
+    ],
+)
 
 logger = logging.getLogger("upgraderr")
 logger.setLevel(level=settings.log_level)
