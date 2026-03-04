@@ -295,12 +295,14 @@ class Upgraderr:
                     upgraderr.search_movie(
                         movie_ids=[media_search.movie_id], session=session
                     )
+                    logger.info(f"Triggering search for {media_search}")
                 elif isinstance(media_search, SeasonSearch) and upgraderr.sonarr:
                     upgraderr.search_season(
                         series_id=media_search.series_id,
                         season_number=media_search.season_number,
                         session=session,
                     )
+                    logger.info(f"Triggering search for {media_search}")
                 searches_triggered += 1
         logger.info(f"Media searching completed. Queued {searches_triggered} searches.")
 
