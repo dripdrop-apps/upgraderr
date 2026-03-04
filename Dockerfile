@@ -5,7 +5,8 @@ RUN apk add --no-cache bash
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
-RUN uv sync --no-dev --frozen
+
+RUN uv sync --no-dev
 
 COPY . .
 
