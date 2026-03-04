@@ -67,11 +67,13 @@ class Upgraderr:
             logger.debug("Radarr is not configured. Skipping...")
             return
 
+        logger.info("Syncing movies from radarr...")
         movies = self.radarr.get_all_movies()
         for movie in movies:
             obj = Movie(tmdb_id=movie.tmdbId, movie_id=movie.id)
             session.merge(obj)
             session.commit()
+        logger.info(f"Synced {len(movies)} movies.")
 
     def _can_episode_be_searched(
         self, series: arr_client.SeriesModel, episode: arr_client.EpisodeModel
@@ -112,6 +114,8 @@ class Upgraderr:
             logger.debug("Sonarr is not configured. Skipping...")
             return
 
+        logger.info("Syncing episodes from sonarr...")
+        count = 0
         all_series = self.sonarr.get_all_series()
         for series in all_series:
             series_id = series.id
@@ -126,6 +130,8 @@ class Upgraderr:
                 )
                 session.merge(obj)
                 session.commit()
+                count += 1
+        logger.info(f"Synced {count} episodes from {len(all_series)} series.")
 
     @classmethod
     def sync(cls):
@@ -162,7 +168,7 @@ class Upgraderr:
                 Movie.job_id.is_(None),
                 or_(
                     Movie.last_searched
-                    < (datetime.now() - timedelta(hours=settings.search_interval)),
+                    < (datetime.now() - timedelta(minutes=settings.search_state_reset)),
                     Movie.last_searched.is_(None),
                 ),
             )
@@ -206,7 +212,7 @@ class Upgraderr:
                 Episode.job_id.is_(None),
                 or_(
                     Episode.last_searched
-                    < (datetime.now() - timedelta(hours=settings.search_interval)),
+                    < (datetime.now() - timedelta(hours=settings.search_state_reset)),
                     Episode.last_searched.is_(None),
                 ),
             )
@@ -273,8 +279,11 @@ class Upgraderr:
         upgraderr.search()
         scheduler.add_job(
             Upgraderr.search_task,
-            trigger=DateTrigger(run_date=datetime.now() + timedelta(minutes=5)),
+            trigger=DateTrigger(
+                run_date=datetime.now() + timedelta(minutes=settings.search_interval)
+            ),
             id="search",
+            replace_existing=True,
         )
 
     @classmethod
@@ -282,11 +291,12 @@ class Upgraderr:
         scheduler.add_job(
             func=Upgraderr.sync,
             trigger=CronTrigger(hour=0, minute=0),
-            id="sync",
+            id="sync-cron",
             replace_existing=True,
         )
 
-        scheduler.add_job(func=Upgraderr.sync, id="sync")
+        logger.info("Running immediate sync...")
+        scheduler.add_job(func=Upgraderr.sync)
         scheduler.add_job(
             func=Upgraderr.search_task, id="search", replace_existing=True
         )
