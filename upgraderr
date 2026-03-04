@@ -4,4 +4,4 @@ set -euo pipefail
 
 alembic upgrade head
 
-uv run -m /app/app "$@"
+uv run -m app "$@"
