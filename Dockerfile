@@ -1,5 +1,7 @@
 FROM ghcr.io/astral-sh/uv:python3.11-alpine
 
+RUN apk add --no-cache bash
+
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
