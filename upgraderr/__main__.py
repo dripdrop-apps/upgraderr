@@ -278,12 +278,21 @@ class Upgraderr:
         scheduler.add_job(
             Upgraderr.search_task,
             trigger=DateTrigger(run_date=datetime.now() + timedelta(minutes=5)),
+            id="search",
+            replace_existing=True,
         )
 
     @classmethod
     def run(cls):
-        scheduler.add_job(func=Upgraderr.sync, trigger=CronTrigger(hour=0, minute=0))
-        scheduler.add_job(func=Upgraderr.search_task)
+        scheduler.add_job(
+            func=Upgraderr.sync,
+            trigger=CronTrigger(hour=0, minute=0),
+            id="sync",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            func=Upgraderr.search_task, id="search", replace_existing=True
+        )
         scheduler.start()
 
 
@@ -292,11 +301,12 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "action",
-        choices=["sync", "search", "run"],
+        choices=["sync", "search", "run", "clear"],
         help="""
         Sync the database with the Sonarr/Radarr instances.
         Search for new episodes/seasons.
-        Run.
+        Run scheduler.
+        Clear jobs from the scheduler.
         """,
     )
 
@@ -308,3 +318,5 @@ if __name__ == "__main__":
         Upgraderr.search()
     elif args.action == "run":
         Upgraderr.run()
+    elif args.action == "clear":
+        scheduler.remove_all_jobs()
