@@ -252,13 +252,17 @@ class Upgraderr:
             movies_to_search = upgraderr.get_movie_searches(session=session)
             for movie_ids in batched(movies_to_search, settings.max_search_limit):
                 if upgraderr.radarr and search_limit:
+                    all_movies = upgraderr.radarr.get_all_movies()
+                    movie_names = [m.title for m in all_movies if m.id in movie_ids]
+                    movies_string = ", ".join(movie_names)
                     if not upgraderr.dry_run:
                         upgraderr.search_movie(
                             movie_ids=list(movie_ids), session=session
                         )
+                        logger.info(f"Triggered search for movies: {movies_string}")
                     else:
                         logger.info(
-                            f"DRY RUN: Skipping searching movie ids ({movie_ids})"
+                            f"DRY RUN: Skipping searching for movies: {movies_string}"
                         )
                     search_limit -= len(movie_ids)
 
@@ -266,15 +270,22 @@ class Upgraderr:
             for series_seasons in batched(seasons_to_search, settings.max_search_limit):
                 for series_id, season_number in series_seasons:
                     if upgraderr.sonarr and search_limit:
+                        all_series = upgraderr.sonarr.get_all_series()
+                        series_name = next(
+                            (s.title for s in all_series if s.id == series_id), None
+                        )
+                        series_string = f"{series_name} S{str(season_number).zfill(2)}"
                         if not upgraderr.dry_run:
                             upgraderr.search_season(
                                 series_id=series_id,
                                 season_number=season_number,
                                 session=session,
                             )
+
+                            logger.info(f"Triggered search for series: {series_string}")
                         else:
                             logger.info(
-                                f"DRY RUN: Skipping searching series id ({series_id}) for season ({season_number})"
+                                f"DRY RUN: Skipping searching series: {series_string}"
                             )
                         search_limit -= 1
 
