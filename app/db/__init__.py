@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy import TIMESTAMP, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
-from upgraderr.settings import settings
+from app.settings import settings
 
 database_url = f"sqlite:///{settings.data_directory}/db.sqlite3"
 engine = create_engine(database_url)

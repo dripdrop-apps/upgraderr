@@ -2,7 +2,7 @@ import requests
 from datetime import datetime
 from functools import lru_cache
 from pydantic import BaseModel
-from upgraderr.settings import settings
+from app.settings import settings
 from typing import TypeVar, Generic
 
 T = TypeVar("T")

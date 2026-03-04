@@ -8,9 +8,9 @@ from datetime import timedelta, datetime
 from itertools import batched
 from sqlalchemy import select, or_, update
 from sqlalchemy.orm import Session
-from upgraderr import arr_client
-from upgraderr.db import Movie, Episode, get_db_session, engine
-from upgraderr.settings import settings
+from app import arr_client
+from app.db import Movie, Episode, get_db_session, engine
+from app.settings import settings
 
 logging.basicConfig(level=logging.INFO)
 

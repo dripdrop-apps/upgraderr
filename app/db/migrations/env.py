@@ -2,7 +2,7 @@ from logging.config import fileConfig
 
 from alembic import context
 
-from upgraderr.db import Base, database_url, engine
+from app.db import Base, database_url, engine
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
