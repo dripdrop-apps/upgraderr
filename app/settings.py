@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     logs_directory: DirectoryPath = "/logs"  # type: ignore
     max_search_limit: int = 20
-    notification_url: HttpUrl | None = None
+    notification_url: str | None = None
     one_shot: bool = False
     search_interval: int = 5  # minutes
     search_state_reset: int = 86400  # minutes

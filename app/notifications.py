@@ -3,7 +3,7 @@ from app.settings import settings
 
 notifications = apprise.Apprise()
 if settings.notification_url:
-    notifications.add(str(settings.notification_url))
+    notifications.add(settings.notification_url)
 
 
 def send_sync_notification(body: str):
