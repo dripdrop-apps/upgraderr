@@ -101,7 +101,11 @@ class Upgraderr:
         logger.info("Syncing movies from radarr...")
         movies = self.radarr.get_all_movies()
         for movie in movies:
-            obj = Movie(tmdb_id=movie.tmdbId, movie_id=movie.id)
+            obj = Movie(
+                tmdb_id=movie.tmdbId,
+                movie_id=movie.id,
+                last_searched=movie.lastSearchTime,
+            )
             session.merge(obj)
             session.commit()
         logger.info(f"Synced {len(movies)} movies.")
@@ -158,6 +162,7 @@ class Upgraderr:
                     episode_number=episode.episodeNumber,
                     season_number=episode.seasonNumber,
                     series_id=series_id,
+                    last_searched=episode.lastSearchTime,
                 )
                 session.merge(obj)
                 session.commit()
