@@ -9,7 +9,7 @@ After the whole `Huntarr` fallout, I realized I missed the functionality of a se
 By just defining your `Arr` apps `Upgraderr` will synchronize your media state to it's database and attempt to trigger indexer searches based on the following decision tree:
 
 ```mermaid
-graph UG;
+graph TD;
     A[Movie/Episode] --> B{Is Monitored?}
     B -- Yes --> C{Is Missing?}
     B -- No --> D[Skip]
