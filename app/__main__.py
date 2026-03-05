@@ -3,6 +3,7 @@ import logging
 import logging.handlers
 import random
 import sys
+from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -46,6 +47,7 @@ def log_and_notify_search(message: str):
 scheduler = BlockingScheduler()
 scheduler.configure(
     jobstores={"default": SQLAlchemyJobStore(engine=engine)},
+    executers={"default": ThreadPoolExecutor(max_workers=1)},
     job_defaults={"coalesce": True},
 )
 
