@@ -6,14 +6,11 @@ import sys
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 from datetime import timedelta, datetime
-from sqlalchemy import select, or_, update
-from sqlalchemy.orm import Session
 from typing import NamedTuple
 from app import arr_client
-from app.db import Movie, Episode, get_db_session, engine
+from app.db import engine
 from app.notifications import send_search_notification, send_sync_notification
 from app.settings import settings
 
@@ -107,22 +104,15 @@ class Upgraderr:
             logger.debug(f"Movie ({movie.title}) does not have a file.")
         return movie_can_be_upgraded or not movie.hasFile
 
-    def sync_movies(self, session: Session):
+    def get_movies(self):
         if not self.radarr:
             logger.debug("Radarr is not configured. Skipping...")
-            return
+            return []
 
-        logger.info("Syncing movies from radarr...")
+        logger.debug("Retrieving movies from radarr...")
         movies = self.radarr.get_all_movies()
-        for movie in movies:
-            obj = Movie(
-                tmdb_id=movie.tmdbId,
-                movie_id=movie.id,
-                last_searched=movie.lastSearchTime,
-            )
-            session.merge(obj)
-            session.commit()
-        log_and_notify_sync(message=f"Successfully synced {len(movies)} movies.")
+        logger.info(f"Successfully retrieved {len(movies)} movies.")
+        return movies
 
     def _can_episode_be_searched(
         self, series: arr_client.SeriesModel, episode: arr_client.EpisodeModel
@@ -158,140 +148,48 @@ class Upgraderr:
             logger.debug(f"Episode ({series.title} - {episode.title}) has no file.")
         return episode_can_be_upgraded or not episode.hasFile
 
-    def sync_episodes(self, session: Session):
+    def get_all_series(self):
         if not self.sonarr:
             logger.debug("Sonarr is not configured. Skipping...")
-            return
-
-        logger.info("Syncing episodes from sonarr...")
-        count = 0
+            return []
+        logger.debug("Retrieving episodes from sonarr...")
         all_series = self.sonarr.get_all_series()
+        count = 0
         for series in all_series:
             series_id = series.id
-            episodes = self.sonarr.get_all_episodes(series_id=series_id)
-            for episode in episodes:
-                obj = Episode(
-                    tvdb_id=episode.tvdbId,
-                    episode_id=episode.id,
-                    episode_number=episode.episodeNumber,
-                    season_number=episode.seasonNumber,
-                    series_id=series_id,
-                    last_searched=episode.lastSearchTime,
-                )
-                session.merge(obj)
-                session.commit()
-                count += 1
-        log_and_notify_sync(
-            message=f"Successfully synced {count} episodes from {len(all_series)} series."
+            series.episodes = self.sonarr.get_all_episodes(series_id=series_id)
+            count += len(series.episodes)
+        logger.info(
+            f"Successfully retrieved {count} episodes from {len(all_series)} series."
         )
+        return all_series
 
-    @classmethod
-    def sync(cls):
-        upgraderr = cls()
-        log_and_notify_sync(message="Starting media sync")
-        with get_db_session() as session:
-            upgraderr.sync_movies(session=session)
-            upgraderr.sync_episodes(session=session)
-        logger.info("Media sync completed.")
-        log_and_notify_sync(message="Media sync completed")
-
-    def search_movie(self, movie_ids: list[int], session: Session):
-        if not self.radarr:
-            return
-
-        self.radarr.search_movie(movie_ids=movie_ids)
-        query = (
-            update(Movie)
-            .where(Movie.movie_id.in_(movie_ids))
-            .values(last_searched=datetime.now())
-        )
-        session.execute(query)
-        session.commit()
-
-    def get_movie_searches(self, session: Session):
-        movies_to_search = set[MovieSearch]()
-
+    def get_movie_searches(self, movies: list[arr_client.MovieModel]):
+        movies_to_search = list[MovieSearch]()
         if not self.radarr:
             logger.debug("Radarr is not configured. Skipping...")
-            return list(movies_to_search)
+            return movies_to_search
+        return [
+            MovieSearch(movie_id=m.id, movie_title=m.title)
+            for m in movies
+            if self._can_movie_be_searched(movie=m)
+        ]
 
-        query = (
-            select(Movie)
-            .where(
-                Movie.job_id.is_(None),
-                or_(
-                    Movie.last_searched
-                    < (datetime.now() - timedelta(minutes=settings.search_state_reset)),
-                    Movie.last_searched.is_(None),
-                ),
-            )
-            .order_by(Movie.tmdb_id.asc())
-        )
-        movies = session.scalars(query).all()
-        for movie in movies:
-            all_movies = self.radarr.get_all_movies()
-            matching_movie = next(
-                (m for m in all_movies if m.tmdbId == movie.tmdb_id), None
-            )
-            if matching_movie and self._can_movie_be_searched(matching_movie):
-                movies_to_search.add(
-                    MovieSearch(
-                        movie_id=matching_movie.id, movie_title=matching_movie.title
-                    )
-                )
-        return list(movies_to_search)
-
-    def search_season(self, series_id: int, season_number: int, session: Session):
-        if not self.sonarr:
-            return
-
-        self.sonarr.search_season(series_id=series_id, season_number=season_number)
-        query = (
-            update(Episode)
-            .where(
-                Episode.series_id == series_id, Episode.season_number == season_number
-            )
-            .values(last_searched=datetime.now())
-        )
-        session.execute(query)
-        session.commit()
-
-    def get_season_searches(self, session: Session):
+    def get_season_searches(self, all_series: list[arr_client.SeriesModel]):
         seasons_to_search = set[SeasonSearch]()
 
         if not self.sonarr:
             logger.debug("Sonarr is not configured. Skipping...")
             return list(seasons_to_search)
 
-        query = (
-            select(Episode)
-            .where(
-                Episode.job_id.is_(None),
-                or_(
-                    Episode.last_searched
-                    < (datetime.now() - timedelta(hours=settings.search_state_reset)),
-                    Episode.last_searched.is_(None),
-                ),
-            )
-            .order_by(Episode.tvdb_id.asc())
-        )
-        episodes = session.scalars(query).all()
-        for episode in episodes:
-            all_series = self.sonarr.get_all_series()
-            matching_series = next((s for s in all_series if s.id == episode.series_id))
-            if matching_series:
-                all_episodes = self.sonarr.get_all_episodes(series_id=episode.series_id)
-                matching_episode = next(
-                    (e for e in all_episodes if e.tvdbId == episode.tvdb_id), None
-                )
-                if matching_episode and self._can_episode_be_searched(
-                    series=matching_series, episode=matching_episode
-                ):
+        for series in all_series:
+            for episode in series.episodes:
+                if self._can_episode_be_searched(series=series, episode=episode):
                     seasons_to_search.add(
                         SeasonSearch(
-                            series_id=matching_series.id,
-                            series_title=matching_series.title,
-                            season_number=episode.season_number,
+                            series_id=series.id,
+                            series_title=series.title,
+                            season_number=episode.seasonNumber,
                         )
                     )
         return list(seasons_to_search)
@@ -299,40 +197,36 @@ class Upgraderr:
     @classmethod
     def search(cls):
         upgraderr = cls()
-        log_and_notify_search(message="Starting media search")
+        logger.info("Starting media search")
+
+        movies = upgraderr.get_movies()
+        all_series = upgraderr.get_all_series()
 
         searches = list[MovieSearch | SeasonSearch]()
         searches_triggered = 0
 
-        with get_db_session() as session:
-            movies_to_search = upgraderr.get_movie_searches(session=session)
-            searches.extend(movies_to_search)
-            seasons_to_search = upgraderr.get_season_searches(session=session)
-            searches.extend(seasons_to_search)
-            random.shuffle(searches)
-            for media_search in searches[: settings.max_search_limit]:
-                if upgraderr.dry_run:
-                    logger.info(f"DRY RUN: Skipping searching for {media_search}")
-                elif isinstance(media_search, MovieSearch) and upgraderr.radarr:
-                    upgraderr.search_movie(
-                        movie_ids=[media_search.movie_id], session=session
-                    )
-                    log_and_notify_search(
-                        message=f"Triggering search for {media_search}"
-                    )
-                elif isinstance(media_search, SeasonSearch) and upgraderr.sonarr:
-                    upgraderr.search_season(
-                        series_id=media_search.series_id,
-                        season_number=media_search.season_number,
-                        session=session,
-                    )
-                    log_and_notify_search(
-                        message=f"Triggering search for {media_search}"
-                    )
-                searches_triggered += 1
-        log_and_notify_search(
-            message=f"Media searching completed. Queued {searches_triggered} searches."
-        )
+        searches.extend(upgraderr.get_movie_searches(movies=movies))
+        searches.extend(upgraderr.get_season_searches(all_series=all_series))
+        random.shuffle(searches)
+
+        logger.debug(f"Found {len(searches)} searches to trigger")
+
+        for media_search in searches[: settings.max_search_limit]:
+            if upgraderr.dry_run:
+                logger.info(f"DRY RUN: Skipping searching for {media_search}")
+            elif isinstance(media_search, MovieSearch) and upgraderr.radarr:
+                # Add wait for commands
+                upgraderr.radarr.search_movie(movie_ids=[media_search.movie_id])
+                log_and_notify_search(message=f"Triggering search for {media_search}")
+            elif isinstance(media_search, SeasonSearch) and upgraderr.sonarr:
+                # Add wait for commands
+                upgraderr.sonarr.search_season(
+                    series_id=media_search.series_id,
+                    season_number=media_search.season_number,
+                )
+                log_and_notify_search(message=f"Triggering search for {media_search}")
+            searches_triggered += 1
+        logger.info(f"Media searching completed. Queued {searches_triggered} searches.")
 
     @classmethod
     def search_task(cls):
@@ -351,19 +245,9 @@ class Upgraderr:
     def run(cls):
         if settings.one_shot:
             upgraderr = cls()
-            upgraderr.sync()
             upgraderr.search()
             return
 
-        scheduler.add_job(
-            func=Upgraderr.sync,
-            trigger=CronTrigger(hour=0, minute=0),
-            id="sync-cron",
-            replace_existing=True,
-        )
-
-        logger.info("Running immediate sync...")
-        scheduler.add_job(func=Upgraderr.sync)
         scheduler.add_job(
             func=Upgraderr.search_task, id="search", replace_existing=True
         )
@@ -375,7 +259,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "action",
-        choices=["sync", "search", "run", "clear"],
+        choices=["search", "run", "clear"],
         help="""
         Sync the database with the Sonarr/Radarr instances.
         Search for new episodes/seasons.
@@ -386,9 +270,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.action == "sync":
-        Upgraderr.sync()
-    elif args.action == "search":
+    if args.action == "search":
         Upgraderr.search()
     elif args.action == "run":
         Upgraderr.run()

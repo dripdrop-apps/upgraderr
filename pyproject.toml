@@ -5,7 +5,6 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "alembic>=1.18.4",
     "apprise>=1.9.7",
     "apscheduler>=3.11.2",
     "pydantic>=2.12.5",
