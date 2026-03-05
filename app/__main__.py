@@ -11,7 +11,7 @@ from datetime import timedelta, datetime
 from typing import NamedTuple
 from app import arr_client
 from app.db import engine
-from app.notifications import send_search_notification, send_sync_notification
+from app.notifications import send_search_notification
 from app.settings import settings
 
 logging.basicConfig(
@@ -29,11 +29,6 @@ logging.basicConfig(
 
 logger = logging.getLogger("upgraderr")
 logger.setLevel(level=settings.log_level)
-
-
-def log_and_notify_sync(message: str):
-    logger.info(message)
-    send_sync_notification(body=message)
 
 
 def log_and_notify_search(message: str):
