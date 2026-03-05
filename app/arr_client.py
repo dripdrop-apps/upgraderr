@@ -32,13 +32,6 @@ class QualityProfileModel(BaseModel):
     id: int
 
 
-class SeriesModel(BaseModel):
-    title: str
-    monitored: bool
-    qualityProfileId: int
-    id: int
-
-
 class EpisodeModel(BaseModel):
     tvdbId: int
     seriesId: int
@@ -49,6 +42,14 @@ class EpisodeModel(BaseModel):
     lastSearchTime: datetime | None = None
     title: str
     id: int
+
+
+class SeriesModel(BaseModel):
+    title: str
+    monitored: bool
+    qualityProfileId: int
+    id: int
+    episodes: list[EpisodeModel] = []
 
 
 class EpisodeFileModel(BaseModel):
