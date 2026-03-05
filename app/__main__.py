@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from typing import NamedTuple
 from app import arr_client
 from app.db import Movie, Episode, get_db_session, engine
+from app.notifications import send_search_notification, send_sync_notification
 from app.settings import settings
 
 logging.basicConfig(
@@ -30,6 +31,17 @@ logging.basicConfig(
 
 logger = logging.getLogger("upgraderr")
 logger.setLevel(level=settings.log_level)
+
+
+def log_and_notify_sync(message: str):
+    logger.info(message)
+    send_sync_notification(body=message)
+
+
+def log_and_notify_search(message: str):
+    logger.info(message)
+    send_search_notification(body=message)
+
 
 scheduler = BlockingScheduler()
 scheduler.configure(
@@ -65,7 +77,7 @@ class Upgraderr:
 
     def _can_movie_be_searched(self, movie: arr_client.MovieModel):
         if not self.radarr:
-            logging.info("Radarr is not configured. Skipping...")
+            logger.info("Radarr is not configured. Skipping...")
             return False
         elif not movie.monitored:
             logger.debug(f"Skipping unmonitored movie ({movie.title})")
@@ -108,7 +120,7 @@ class Upgraderr:
             )
             session.merge(obj)
             session.commit()
-        logger.info(f"Synced {len(movies)} movies.")
+        log_and_notify_sync(message=f"Successfully synced {len(movies)} movies.")
 
     def _can_episode_be_searched(
         self, series: arr_client.SeriesModel, episode: arr_client.EpisodeModel
@@ -167,16 +179,19 @@ class Upgraderr:
                 session.merge(obj)
                 session.commit()
                 count += 1
-        logger.info(f"Synced {count} episodes from {len(all_series)} series.")
+        log_and_notify_sync(
+            message=f"Successfully synced {count} episodes from {len(all_series)} series."
+        )
 
     @classmethod
     def sync(cls):
         upgraderr = cls()
-        logger.info("Starting media sync...")
+        log_and_notify_sync(message="Starting media sync")
         with get_db_session() as session:
             upgraderr.sync_movies(session=session)
             upgraderr.sync_episodes(session=session)
         logger.info("Media sync completed.")
+        log_and_notify_sync(message="Media sync completed")
 
     def search_movie(self, movie_ids: list[int], session: Session):
         if not self.radarr:
@@ -195,7 +210,7 @@ class Upgraderr:
         movies_to_search = set[MovieSearch]()
 
         if not self.radarr:
-            logging.debug("Radarr is not configured. Skipping...")
+            logger.debug("Radarr is not configured. Skipping...")
             return list(movies_to_search)
 
         query = (
@@ -282,7 +297,7 @@ class Upgraderr:
     @classmethod
     def search(cls):
         upgraderr = cls()
-        logger.info("Starting media searching...")
+        log_and_notify_search(message="Starting media search")
 
         searches = list[MovieSearch | SeasonSearch]()
         searches_triggered = 0
@@ -300,16 +315,22 @@ class Upgraderr:
                     upgraderr.search_movie(
                         movie_ids=[media_search.movie_id], session=session
                     )
-                    logger.info(f"Triggering search for {media_search}")
+                    log_and_notify_search(
+                        message=f"Triggering search for {media_search}"
+                    )
                 elif isinstance(media_search, SeasonSearch) and upgraderr.sonarr:
                     upgraderr.search_season(
                         series_id=media_search.series_id,
                         season_number=media_search.season_number,
                         session=session,
                     )
-                    logger.info(f"Triggering search for {media_search}")
+                    log_and_notify_search(
+                        message=f"Triggering search for {media_search}"
+                    )
                 searches_triggered += 1
-        logger.info(f"Media searching completed. Queued {searches_triggered} searches.")
+        log_and_notify_search(
+            message=f"Media searching completed. Queued {searches_triggered} searches."
+        )
 
     @classmethod
     def search_task(cls):
