@@ -9,14 +9,14 @@ After the whole `Huntarr` fallout, I realized I missed the functionality of a se
 By just defining your `Arr` apps `Upgraderr` will synchronize your media state to it's database and attempt to trigger indexer searches based on the following decision tree:
 
 ```mermaid
-flowchart upgrade;
-A[Movie/Episode] --> B{Is Monitored?}
-B -- Yes --> C{Is Missing?}
-B -- No --> D[Skip]
-C -- Yes --> E[Trigger Search]
-C -- No --> F{Is Custom Format Score Exceeded Cutoff?}
-F -- Yes --> G[Skip]
-F -- No --> H[Trigger Search]
+graph upgrade;
+    A[Movie/Episode] --> B{Is Monitored?}
+    B -- Yes --> C{Is Missing?}
+    B -- No --> D[Skip]
+    C -- Yes --> E[Trigger Search]
+    C -- No --> F{Is Custom Format Score Exceeded Cutoff?}
+    F -- Yes --> G[Skip]
+    F -- No --> H[Trigger Search]
 ```
 
 For episodes in Sonarr the default behavior is to **only** trigger season searches
