@@ -70,6 +70,22 @@ class EpisodeFileModel(BaseModel):
     id: int
 
 
+class EpisodeDetailModel(BaseModel):
+    seriesId: int
+    episodeId: int
+    seasonNumber: int
+
+
+class EpisodeReleaseModel(BaseModel):
+    customFormatScore: int
+    approved: bool
+    fullSeason: bool
+    rejections: list[str]
+    guid: str
+    indexerId: int
+    title: str
+
+
 class SonarrClient(ArrClient):
     @classmethod
     def initialize(cls, *args, **kwargs):
@@ -106,6 +122,10 @@ class SonarrClient(ArrClient):
             (ef.customFormatScore for ef in episode_files if ef.id == episode_file_id),
             None,
         )
+
+    def get_queue_details_for_series(self, series_id: int):
+        response = self.get("/api/v3/queue/details", params={"seriesId": series_id})
+        return [EpisodeDetailModel.model_validate(_) for _ in response.json()]
 
     @lru_cache()
     def get_all_series(self):
@@ -146,6 +166,16 @@ class SonarrClient(ArrClient):
                 return command_status.message
             time.sleep(10)
         return "Timed out waiting for command"
+
+    def get_releases(self, series_id: int, season_number: int):
+        response = self.get(
+            "/api/v3/release",
+            params={"seriesId": series_id, "seasonNumber": season_number},
+        )
+        return [EpisodeReleaseModel.model_validate(_) for _ in response.json()]
+
+    def grab_release(self, guid: str, indexerId: int):
+        self.post("/api/v3/release", json={"guid": guid, "indexerId": indexerId})
 
 
 class MovieModel(BaseModel):
