@@ -111,7 +111,7 @@ class SonarrClient(ArrClient):
         return [EpisodeModel.model_validate(_) for _ in response.json()]
 
     def search_season(self, series_id: int, season_number: int):
-        response = self.get(
+        response = self.post(
             "/api/v3/command",
             json={
                 "name": "SeasonSearch",
@@ -122,7 +122,7 @@ class SonarrClient(ArrClient):
         return CommandStatus.model_validate(response.json())
 
     def search_episodes(self, episode_ids: list[int]):
-        response = self.get(
+        response = self.post(
             "/api/v3/command", json={"name": "EpisodeSearch", "episodeIds": episode_ids}
         )
         return CommandStatus.model_validate(response.json())
