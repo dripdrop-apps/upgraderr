@@ -19,11 +19,6 @@ graph TD;
     F -- No --> H[Trigger Search]
 ```
 
-For episodes in Sonarr the default behavior is to **only** trigger season searches
-
-> ![INFO]
-> Episode searching will be added soon!
-
 ## Why do I even need this?
 
 I noticed a lot of people never really understood the want for this kind of application and to be fair it is catered to a really specific want that the `Arr` apps don't fulfill. `Arr` apps perform full indexer searches when clicking on a button from their UI or from applications like `Seerr` when requesting media. But once an Episode or Season from a Series is added, after the initial search, the `Arr` apps rely purely on RSS Feeds for searching. So if you ever join a new tracker or if you missed a release due to rate-limiting from an indexer, there's a good chance you missed a high quality media file. This script aims to solve that by periodically triggering full searches for your media items.
