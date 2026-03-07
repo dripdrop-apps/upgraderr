@@ -197,7 +197,7 @@ class Upgraderr:
     ):
         arr_name = "Radarr" if isinstance(arr, arr_client.RadarrClient) else "Sonarr"
         start_time = datetime.now()
-        while datetime.now() - start_time > timedelta(minutes=5):
+        while datetime.now() - start_time < timedelta(minutes=5):
             command_status = arr.get_command_status(id=command_id)
             logger.debug(f"Command Status: {command_status}")
             if command_status.status == "completed":
