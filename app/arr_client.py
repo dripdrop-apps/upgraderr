@@ -3,7 +3,7 @@ from datetime import datetime
 from functools import lru_cache
 from pydantic import BaseModel
 from app.settings import settings
-from typing import TypeVar, Generic
+from typing import TypeVar, Generic, Literal
 
 T = TypeVar("T")
 
@@ -30,6 +30,13 @@ class ArrClient(Generic[T], requests.Session):
 class QualityProfileModel(BaseModel):
     cutoffFormatScore: int
     id: int
+
+
+class CommandStatus(BaseModel):
+    id: int
+    commandName: str
+    message: str | None = None
+    status: Literal["queued", "completed"]
 
 
 class EpisodeModel(BaseModel):
@@ -104,7 +111,7 @@ class SonarrClient(ArrClient):
         return [EpisodeModel.model_validate(_) for _ in response.json()]
 
     def search_season(self, series_id: int, season_number: int):
-        self.get(
+        response = self.get(
             "/api/v3/command",
             json={
                 "name": "SeasonSearch",
@@ -112,11 +119,17 @@ class SonarrClient(ArrClient):
                 "seriesId": series_id,
             },
         )
+        return CommandStatus.model_validate(response.json())
 
     def search_episodes(self, episode_ids: list[int]):
-        self.get(
+        response = self.get(
             "/api/v3/command", json={"name": "EpisodeSearch", "episodeIds": episode_ids}
         )
+        return CommandStatus.model_validate(response.json())
+
+    def get_command_status(self, id: int):
+        response = self.get(f"/api/v3/command/{id}")
+        return CommandStatus.model_validate(response.json())
 
 
 class MovieModel(BaseModel):
@@ -169,6 +182,11 @@ class RadarrClient(ArrClient):
         return [MovieModel.model_validate(_) for _ in response.json()]
 
     def search_movie(self, movie_ids: list[int]):
-        self.post(
+        response = self.post(
             "/api/v3/command", json={"name": "MoviesSearch", "movieIds": movie_ids}
         )
+        return CommandStatus.model_validate(response.json())
+
+    def get_command_status(self, id: int):
+        response = self.get(f"/api/v3/command/{id}")
+        return CommandStatus.model_validate(response.json())
