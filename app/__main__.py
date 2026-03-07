@@ -4,7 +4,6 @@ import logging.handlers
 import random
 import sys
 import time
-from datetime import timedelta, datetime
 from typing import NamedTuple
 from app import arr_client
 from app.notifications import send_search_notification
@@ -109,7 +108,7 @@ class Upgraderr:
             return False
 
         episode_custom_format_score = self.sonarr.get_episode_custom_format_score(
-            episode_id=episode.id, series_id=episode.seriesId
+            episode_file_id=episode.episodeFileId, series_id=episode.seriesId
         )
         profile_max_custom_format_score = (
             self.sonarr.get_quality_profile_custom_format_score(
@@ -177,23 +176,6 @@ class Upgraderr:
                     )
         return list(seasons_to_search)
 
-    def wait_for_command(
-        self,
-        arr: arr_client.RadarrClient | arr_client.SonarrClient,
-        command_id: int,
-    ):
-        arr_name = "Radarr" if isinstance(arr, arr_client.RadarrClient) else "Sonarr"
-        start_time = datetime.now()
-        while datetime.now() - start_time < timedelta(minutes=5):
-            command_status = arr.get_command_status(id=command_id)
-            logger.debug(f"Command Status: {command_status}")
-            if command_status.status == "completed":
-                return command_status.message
-
-            time.sleep(10)
-        logging.info(f"Timed out waiting for command {command_id} in {arr_name}")
-        return "Timed out waiting for command"
-
     @classmethod
     def search(cls):
         upgraderr = cls()
@@ -219,9 +201,7 @@ class Upgraderr:
                     movie_ids=[media_search.movie_id]
                 )
                 logger.info(f"Triggering search for {media_search}")
-                result = upgraderr.wait_for_command(
-                    arr=upgraderr.radarr, command_id=command.id
-                )
+                result = upgraderr.radarr.wait_for_command(command_id=command.id)
                 log_and_notify_search(
                     message=f"Triggered search for {media_search}\nResult: {result}"
                 )
@@ -231,9 +211,7 @@ class Upgraderr:
                     season_number=media_search.season_number,
                 )
                 logger.info(f"Triggering search for {media_search}")
-                result = upgraderr.wait_for_command(
-                    arr=upgraderr.sonarr, command_id=command.id
-                )
+                result = upgraderr.sonarr.wait_for_command(command_id=command.id)
                 log_and_notify_search(
                     message=f"Triggered search for {media_search}\nResult: {result}"
                 )

@@ -1,5 +1,6 @@
 import requests
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 from functools import lru_cache
 from pydantic import BaseModel
 from app.settings import settings
@@ -44,6 +45,7 @@ class EpisodeModel(BaseModel):
     seriesId: int
     seasonNumber: int
     episodeNumber: int
+    episodeFileId: int
     hasFile: bool
     monitored: bool
     lastSearchTime: datetime | None = None
@@ -94,10 +96,11 @@ class SonarrClient(ArrClient):
         )
         return [EpisodeFileModel.model_validate(_) for _ in response.json()]
 
-    def get_episode_custom_format_score(self, series_id: int, episode_id: int):
+    def get_episode_custom_format_score(self, series_id: int, episode_file_id: int):
         episode_files = self.get_episode_files(series_id=series_id)
         return next(
-            (ef.customFormatScore for ef in episode_files if ef.id == episode_id), None
+            (ef.customFormatScore for ef in episode_files if ef.id == episode_file_id),
+            None,
         )
 
     @lru_cache()
@@ -130,6 +133,15 @@ class SonarrClient(ArrClient):
     def get_command_status(self, id: int):
         response = self.get(f"/api/v3/command/{id}")
         return CommandStatus.model_validate(response.json())
+
+    def wait_for_command(self, command_id: int):
+        start_time = datetime.now()
+        while datetime.now() - start_time < timedelta(minutes=5):
+            command_status = self.get_command_status(id=command_id)
+            if command_status.status == "completed":
+                return command_status.message
+            time.sleep(10)
+        return "Timed out waiting for command"
 
 
 class MovieModel(BaseModel):
@@ -190,3 +202,12 @@ class RadarrClient(ArrClient):
     def get_command_status(self, id: int):
         response = self.get(f"/api/v3/command/{id}")
         return CommandStatus.model_validate(response.json())
+
+    def wait_for_command(self, command_id: int):
+        start_time = datetime.now()
+        while datetime.now() - start_time < timedelta(minutes=5):
+            command_status = self.get_command_status(id=command_id)
+            if command_status.status == "completed":
+                return command_status.message
+            time.sleep(10)
+        return "Timed out waiting for command"
