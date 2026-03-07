@@ -4,14 +4,9 @@ import logging.handlers
 import random
 import sys
 import time
-from apscheduler.executors.pool import ThreadPoolExecutor
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
-from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.triggers.date import DateTrigger
 from datetime import timedelta, datetime
 from typing import NamedTuple
 from app import arr_client
-from app.db import engine
 from app.notifications import send_search_notification
 from app.settings import settings
 
@@ -35,14 +30,6 @@ logger.setLevel(level=settings.log_level)
 def log_and_notify_search(message: str):
     logger.info(message)
     send_search_notification(body=message)
-
-
-scheduler = BlockingScheduler()
-scheduler.configure(
-    jobstores={"default": SQLAlchemyJobStore(engine=engine)},
-    executers={"default": ThreadPoolExecutor(max_workers=1)},
-    job_defaults={"coalesce": True},
-)
 
 
 class MovieSearch(NamedTuple):
@@ -254,29 +241,16 @@ class Upgraderr:
         logger.info(f"Media searching completed. Queued {searches_triggered} searches.")
 
     @classmethod
-    def search_task(cls):
-        upgraderr = cls()
-        upgraderr.search()
-        scheduler.add_job(
-            Upgraderr.search_task,
-            trigger=DateTrigger(
-                run_date=datetime.now() + timedelta(minutes=settings.search_interval)
-            ),
-            id="search",
-            replace_existing=True,
-        )
-
-    @classmethod
     def run(cls):
-        if settings.one_shot:
-            upgraderr = cls()
-            upgraderr.search()
-            return
-
-        scheduler.add_job(
-            func=Upgraderr.search_task, id="search", replace_existing=True
-        )
-        scheduler.start()
+        upgraderr = cls()
+        while True:
+            try:
+                upgraderr.search()
+            except Exception as e:
+                logger.info(f"Error during search: {e}", exc_info=True)
+            if settings.one_shot:
+                return
+            time.sleep(60 * settings.search_interval)
 
 
 if __name__ == "__main__":
@@ -284,20 +258,11 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "action",
-        choices=["search", "run", "clear"],
-        help="""
-        Sync the database with the Sonarr/Radarr instances.
-        Search for new episodes/seasons.
-        Run scheduler.
-        Clear jobs from the scheduler.
-        """,
+        choices=["run"],
+        help="""Search for new episodes/seasons.""",
     )
 
     args = parser.parse_args()
 
-    if args.action == "search":
-        Upgraderr.search()
-    elif args.action == "run":
+    if args.action == "run":
         Upgraderr.run()
-    elif args.action == "clear":
-        scheduler.remove_all_jobs()
