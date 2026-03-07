@@ -1,5 +1,6 @@
 from pydantic import HttpUrl, DirectoryPath
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Literal
 
 
 class Settings(BaseSettings):
@@ -20,6 +21,7 @@ class Settings(BaseSettings):
     one_shot: bool = False
     search_interval: int = 5  # minutes
     search_state_reset: int = 86400  # minutes
+    sonarr_search: Literal["episode", "season"] = "season"
 
 
 settings = Settings()  # type: ignore
