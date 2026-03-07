@@ -26,7 +26,7 @@ logger = logging.getLogger("upgraderr")
 logger.setLevel(level=settings.log_level)
 
 
-def log_and_notify_search(message: str):
+def log_and_notify(message: str):
     logger.info(message)
     send_search_notification(body=message)
 
@@ -43,6 +43,7 @@ class SeasonSearch(NamedTuple):
     series_id: int
     series_title: str
     season_number: int
+    episode_custom_format_score: int | None
 
     def __str__(self) -> str:
         return f"Series: {self.series_title} S{self.season_number:02}"
@@ -178,9 +179,81 @@ class Upgraderr:
                             series_id=series.id,
                             series_title=series.title,
                             season_number=episode.seasonNumber,
+                            episode_custom_format_score=self.sonarr.get_episode_custom_format_score(
+                                series_id=series.id,
+                                episode_file_id=episode.episodeFileId,
+                            ),
                         )
                     )
         return list(seasons_to_search)
+
+    def search_movie(self, media_search: MovieSearch):
+        if not self.radarr:
+            return
+        command = self.radarr.search_movie(movie_ids=[media_search.movie_id])
+        logger.info(f"Triggering search for {media_search}")
+        result = self.radarr.wait_for_command(command_id=command.id)
+        log_and_notify(message=f"Triggered search for {media_search}\nResult: {result}")
+
+    def is_qualified_release(
+        self, media_search: SeasonSearch, release: arr_client.EpisodeReleaseModel
+    ):
+        if release.approved:
+            return True
+        return (
+            isinstance(media_search.episode_custom_format_score, int)
+            and release.customFormatScore > media_search.episode_custom_format_score
+            and len(release.rejections) == 1
+            and release.rejections[0].startswith(
+                "Existing file on disk has a equal or higher Custom Format score"
+            )
+        )
+
+    def search_season(self, media_search: SeasonSearch):
+        if not self.sonarr:
+            return
+        if settings.sonarr_search == "episode":
+            command = self.sonarr.search_season(
+                series_id=media_search.series_id,
+                season_number=media_search.season_number,
+            )
+            logger.info(f"Triggering search for {media_search}")
+            result = self.sonarr.wait_for_command(command_id=command.id)
+            log_and_notify(
+                message=f"Triggered search for {media_search}\nResult: {result}"
+            )
+        elif settings.sonarr_search == "season":
+            logger.info(f"Grabbing releases for {media_search}")
+            releases = self.sonarr.get_releases(
+                series_id=media_search.series_id,
+                season_number=media_search.season_number,
+            )
+            qualified_release = next(
+                (
+                    r
+                    for r in releases
+                    if self.is_qualified_release(media_search=media_search, release=r)
+                ),
+                None,
+            )
+            if qualified_release:
+                try:
+                    self.sonarr.grab_release(
+                        guid=qualified_release.guid,
+                        indexerId=qualified_release.indexerId,
+                    )
+                    log_and_notify(
+                        message=f"Grabbed release for {media_search}\nRelease Name: {qualified_release.title}"
+                    )
+                except Exception as e:
+                    logger.debug(
+                        f"Failed to grab release for {media_search}: {e}", exc_info=True
+                    )
+                    log_and_notify(
+                        message=f"Attempted to grab release for {media_search} but failed"
+                    )
+            else:
+                logger.info(f"No qualified release found for {media_search}")
 
     @classmethod
     def search(cls):
@@ -203,24 +276,9 @@ class Upgraderr:
             if upgraderr.dry_run:
                 logger.info(f"DRY RUN: Skipping searching for {media_search}")
             elif isinstance(media_search, MovieSearch) and upgraderr.radarr:
-                command = upgraderr.radarr.search_movie(
-                    movie_ids=[media_search.movie_id]
-                )
-                logger.info(f"Triggering search for {media_search}")
-                result = upgraderr.radarr.wait_for_command(command_id=command.id)
-                log_and_notify_search(
-                    message=f"Triggered search for {media_search}\nResult: {result}"
-                )
+                upgraderr.search_movie(media_search=media_search)
             elif isinstance(media_search, SeasonSearch) and upgraderr.sonarr:
-                command = upgraderr.sonarr.search_season(
-                    series_id=media_search.series_id,
-                    season_number=media_search.season_number,
-                )
-                logger.info(f"Triggering search for {media_search}")
-                result = upgraderr.sonarr.wait_for_command(command_id=command.id)
-                log_and_notify_search(
-                    message=f"Triggered search for {media_search}\nResult: {result}"
-                )
+                upgraderr.search_season(media_search=media_search)
             searches_triggered += 1
         logger.info(f"Media searching completed. Queued {searches_triggered} searches.")
 
