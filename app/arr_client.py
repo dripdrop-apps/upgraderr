@@ -36,7 +36,7 @@ class CommandStatus(BaseModel):
     id: int
     commandName: str
     message: str | None = None
-    status: Literal["queued", "completed"]
+    status: Literal["queued", "completed", "started"]
 
 
 class EpisodeModel(BaseModel):
