@@ -1,6 +1,6 @@
 import requests
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from functools import lru_cache
 from pydantic import BaseModel
 from app.settings import settings
@@ -48,9 +48,13 @@ class EpisodeModel(BaseModel):
     episodeFileId: int
     hasFile: bool
     monitored: bool
+    airDate: date | None = None
     lastSearchTime: datetime | None = None
     title: str
     id: int
+
+    def is_released(self):
+        return datetime.now().date() >= self.airDate if self.airDate else False
 
 
 class SeriesModel(BaseModel):
@@ -149,9 +153,13 @@ class MovieModel(BaseModel):
     qualityProfileId: int
     hasFile: bool
     monitored: bool
+    releaseDate: datetime | None = None
     lastSearchTime: datetime | None = None
     title: str
     id: int
+
+    def is_released(self):
+        return datetime.now() >= self.releaseDate if self.releaseDate else False
 
 
 class MovieFileModel(BaseModel):

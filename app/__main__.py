@@ -63,6 +63,8 @@ class Upgraderr:
         elif not movie.monitored:
             logger.debug(f"Skipping unmonitored movie ({movie.title})")
             return False
+        elif not movie.is_released():
+            logger.debug(f"Skipping unreleased movie ({movie.title})")
 
         movie_custom_format_score = self.radarr.get_movie_custom_format_score(
             movie_id=movie.id
@@ -106,6 +108,10 @@ class Upgraderr:
                 f"Skipping unmonitored episode ({series.title} - {episode.title})"
             )
             return False
+        elif not episode.is_released():
+            logger.debug(
+                f"Skipping unreleased episode ({series.title} - {episode.title})"
+            )
 
         episode_custom_format_score = self.sonarr.get_episode_custom_format_score(
             episode_file_id=episode.episodeFileId, series_id=episode.seriesId
