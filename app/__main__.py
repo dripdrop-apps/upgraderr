@@ -3,6 +3,7 @@ import logging
 import logging.handlers
 import random
 import sys
+import time
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -189,6 +190,23 @@ class Upgraderr:
                     )
         return list(seasons_to_search)
 
+    def wait_for_command(
+        self,
+        arr: arr_client.RadarrClient | arr_client.SonarrClient,
+        command_id: int,
+    ):
+        arr_name = "Radarr" if isinstance(arr, arr_client.RadarrClient) else "Sonarr"
+        start_time = datetime.now()
+        while datetime.now() - start_time > timedelta(minutes=5):
+            command_status = arr.get_command_status(id=command_id)
+            logger.debug(f"Command Status: {command_status}")
+            if command_status.status == "completed":
+                return command_status.message
+
+            time.sleep(10)
+        logging.info(f"Timed out waiting for command {command_id} in {arr_name}")
+        return "Timed out waiting for command"
+
     @classmethod
     def search(cls):
         upgraderr = cls()
@@ -210,16 +228,28 @@ class Upgraderr:
             if upgraderr.dry_run:
                 logger.info(f"DRY RUN: Skipping searching for {media_search}")
             elif isinstance(media_search, MovieSearch) and upgraderr.radarr:
-                # Add wait for commands
-                upgraderr.radarr.search_movie(movie_ids=[media_search.movie_id])
-                log_and_notify_search(message=f"Triggering search for {media_search}")
+                command = upgraderr.radarr.search_movie(
+                    movie_ids=[media_search.movie_id]
+                )
+                logger.info(f"Triggering search for {media_search}")
+                result = upgraderr.wait_for_command(
+                    arr=upgraderr.radarr, command_id=command.id
+                )
+                log_and_notify_search(
+                    message=f"Triggered search for {media_search}\nResult: {result}"
+                )
             elif isinstance(media_search, SeasonSearch) and upgraderr.sonarr:
-                # Add wait for commands
-                upgraderr.sonarr.search_season(
+                command = upgraderr.sonarr.search_season(
                     series_id=media_search.series_id,
                     season_number=media_search.season_number,
                 )
-                log_and_notify_search(message=f"Triggering search for {media_search}")
+                logger.info(f"Triggering search for {media_search}")
+                result = upgraderr.wait_for_command(
+                    arr=upgraderr.sonarr, command_id=command.id
+                )
+                log_and_notify_search(
+                    message=f"Triggered search for {media_search}\nResult: {result}"
+                )
             searches_triggered += 1
         logger.info(f"Media searching completed. Queued {searches_triggered} searches.")
 
