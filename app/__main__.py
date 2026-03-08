@@ -7,7 +7,7 @@ import time
 from datetime import datetime, timedelta, UTC
 from typing import NamedTuple
 from app import arr_client
-from app.notifications import send_search_notification
+from app.notifications import send_search_notification, apprise
 from app.settings import settings
 
 logging.basicConfig(
@@ -27,9 +27,9 @@ logger = logging.getLogger("upgraderr")
 logger.setLevel(level=settings.log_level)
 
 
-def log_and_notify(message: str):
+def log_and_notify(message: str, level=apprise.NotifyType.INFO):
     logger.info(message)
-    send_search_notification(body=message)
+    send_search_notification(body=message, level=level)
 
 
 class MovieSearch(NamedTuple):
@@ -239,16 +239,31 @@ class Upgraderr:
                 season_number=media_search.season_number,
             )
             logger.info(f"Triggering search for {media_search}")
-            result = self.sonarr.wait_for_command(command_id=command.id)
-            log_and_notify(
-                message=f"Triggered search for {media_search}\nResult: {result}"
-            )
+            try:
+                result = self.sonarr.wait_for_command(command_id=command.id)
+                log_and_notify(
+                    message=f"Triggered search for {media_search}\nResult: {result}"
+                )
+            except Exception:
+                log_and_notify(
+                    message=f"Timed out waiting for command for {media_search}",
+                    level=apprise.NotifyType.FAILURE,
+                )
         elif settings.sonarr_search == "release":
             logger.info(f"Grabbing releases for {media_search}")
-            releases = self.sonarr.get_releases(
-                series_id=media_search.series_id,
-                season_number=media_search.season_number,
-            )
+            try:
+                releases = self.sonarr.get_releases(
+                    series_id=media_search.series_id,
+                    season_number=media_search.season_number,
+                )
+            except Exception:
+                logger.info(f"Failed to get releases for {media_search}", exc_info=True)
+                log_and_notify(
+                    message=f"Attempted to grab releases for {media_search} but failed",
+                    level=apprise.NotifyType.FAILURE,
+                )
+                return
+
             qualified_release = next(
                 (
                     r
@@ -257,24 +272,22 @@ class Upgraderr:
                 ),
                 None,
             )
-            if qualified_release:
-                try:
-                    self.sonarr.grab_release(
-                        guid=qualified_release.guid,
-                        indexerId=qualified_release.indexerId,
-                    )
-                    log_and_notify(
-                        message=f"Grabbed release for {media_search}\nRelease Name: {qualified_release.title}"
-                    )
-                except Exception as e:
-                    logger.debug(
-                        f"Failed to grab release for {media_search}: {e}", exc_info=True
-                    )
-                    log_and_notify(
-                        message=f"Attempted to grab release for {media_search} but failed"
-                    )
-            else:
+            if not qualified_release:
                 logger.info(f"No qualified release found for {media_search}")
+                return
+            try:
+                self.sonarr.grab_release(
+                    guid=qualified_release.guid,
+                    indexerId=qualified_release.indexerId,
+                )
+                log_and_notify(
+                    message=f"Grabbed release for {media_search}\nRelease Name: {qualified_release.title}"
+                )
+            except Exception:
+                log_and_notify(
+                    message=f"Failed to grab release for {media_search}\nRelease Name: {qualified_release.title}",
+                    level=apprise.NotifyType.FAILURE,
+                )
 
     @classmethod
     def search(cls):
