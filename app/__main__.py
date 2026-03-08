@@ -277,6 +277,7 @@ class Upgraderr:
                     r
                     for r in releases
                     if self.is_qualified_release(media_search=media_search, release=r)
+                    and r.fullSeason
                 ),
                 None,
             )
