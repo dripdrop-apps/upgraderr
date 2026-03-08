@@ -213,8 +213,16 @@ class Upgraderr:
             return
         command = self.radarr.search_movie(movie_ids=[media_search.movie_id])
         logger.info(f"Triggering search for {media_search}")
-        result = self.radarr.wait_for_command(command_id=command.id)
-        log_and_notify(message=f"Triggered search for {media_search}\nResult: {result}")
+        try:
+            result = self.radarr.wait_for_command(command_id=command.id)
+            log_and_notify(
+                message=f"Triggered search for {media_search}\nResult: {result}"
+            )
+        except Exception:
+            log_and_notify(
+                message=f"Timed out waiting for command for {media_search}",
+                level=apprise.NotifyType.FAILURE,
+            )
 
     def is_qualified_release(
         self, media_search: SeasonSearch, release: arr_client.EpisodeReleaseModel
