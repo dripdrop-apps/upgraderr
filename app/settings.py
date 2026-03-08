@@ -20,8 +20,8 @@ class Settings(BaseSettings):
     notification_url: str | None = None
     one_shot: bool = False
     search_interval: int = 5  # minutes
-    search_state_reset: int = 86400  # minutes
-    sonarr_search: Literal["episode", "season"] = "season"
+    search_refresh_interval: int = 86400  # minutes
+    sonarr_search: Literal["release", "command"] = "command"
 
 
 settings = Settings()  # type: ignore

@@ -70,7 +70,7 @@ class Upgraderr:
             return False
         elif (
             movie.lastSearchTime
-            and datetime.now() - timedelta(minutes=settings.search_state_reset)
+            and datetime.now() - timedelta(minutes=settings.search_refresh_interval)
             < movie.lastSearchTime
         ):
             logger.debug(f"Skipping recently search episode ({movie.title})")
@@ -125,7 +125,7 @@ class Upgraderr:
             return False
         elif (
             episode.lastSearchTime
-            and datetime.now() - timedelta(minutes=settings.search_state_reset)
+            and datetime.now() - timedelta(minutes=settings.search_refresh_interval)
             < episode.lastSearchTime
         ):
             logger.debug(
@@ -231,7 +231,7 @@ class Upgraderr:
     def search_season(self, media_search: SeasonSearch):
         if not self.sonarr:
             return
-        if settings.sonarr_search == "episode":
+        if settings.sonarr_search == "command":
             command = self.sonarr.search_season(
                 series_id=media_search.series_id,
                 season_number=media_search.season_number,
@@ -241,7 +241,7 @@ class Upgraderr:
             log_and_notify(
                 message=f"Triggered search for {media_search}\nResult: {result}"
             )
-        elif settings.sonarr_search == "season":
+        elif settings.sonarr_search == "release":
             logger.info(f"Grabbing releases for {media_search}")
             releases = self.sonarr.get_releases(
                 series_id=media_search.series_id,
