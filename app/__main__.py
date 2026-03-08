@@ -6,7 +6,8 @@ import sys
 import time
 from datetime import datetime, timedelta, UTC
 from typing import NamedTuple
-from app import arr_client
+from app.arr.radarr import MovieModel, RadarrClient
+from app.arr.sonarr import EpisodeModel, EpisodeReleaseModel, SeriesModel, SonarrClient
 from app.notifications import send_search_notification, apprise
 from app.settings import settings
 
@@ -52,8 +53,8 @@ class SeasonSearch(NamedTuple):
 
 class Upgraderr:
     def __init__(self):
-        self.sonarr = arr_client.SonarrClient.initialize()
-        self.radarr = arr_client.RadarrClient.initialize()
+        self.sonarr = SonarrClient.initialize()
+        self.radarr = RadarrClient.initialize()
         self.dry_run = settings.dry_run
         if self.dry_run:
             logger.info("DRY RUN: No searches will be executed.")
@@ -64,7 +65,7 @@ class Upgraderr:
             < last_search_time
         )
 
-    def _can_movie_be_searched(self, movie: arr_client.MovieModel):
+    def _can_movie_be_searched(self, movie: MovieModel):
         if not self.radarr:
             logger.info("Radarr is not configured. Skipping...")
             return False
@@ -112,9 +113,7 @@ class Upgraderr:
         logger.info(f"Successfully retrieved {len(movies)} movies.")
         return movies
 
-    def _can_episode_be_searched(
-        self, series: arr_client.SeriesModel, episode: arr_client.EpisodeModel
-    ):
+    def _can_episode_be_searched(self, series: SeriesModel, episode: EpisodeModel):
         if not self.sonarr:
             return False
         elif not episode.monitored:
@@ -174,7 +173,7 @@ class Upgraderr:
         )
         return all_series
 
-    def get_movie_searches(self, movies: list[arr_client.MovieModel]):
+    def get_movie_searches(self, movies: list[MovieModel]):
         movies_to_search = list[MovieSearch]()
         if not self.radarr:
             logger.debug("Radarr is not configured. Skipping...")
@@ -185,7 +184,7 @@ class Upgraderr:
             if self._can_movie_be_searched(movie=m)
         ]
 
-    def get_season_searches(self, all_series: list[arr_client.SeriesModel]):
+    def get_season_searches(self, all_series: list[SeriesModel]):
         seasons_to_search = set[SeasonSearch]()
 
         if not self.sonarr:
@@ -225,7 +224,7 @@ class Upgraderr:
             )
 
     def is_qualified_release(
-        self, media_search: SeasonSearch, release: arr_client.EpisodeReleaseModel
+        self, media_search: SeasonSearch, release: EpisodeReleaseModel
     ):
         if release.approved:
             return True
