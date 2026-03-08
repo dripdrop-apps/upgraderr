@@ -4,7 +4,7 @@ import logging.handlers
 import random
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import NamedTuple
 from app import arr_client
 from app.notifications import send_search_notification
@@ -58,6 +58,12 @@ class Upgraderr:
         if self.dry_run:
             logger.info("DRY RUN: No searches will be executed.")
 
+    def _was_media_recently_searched(self, last_search_time: datetime):
+        return (
+            datetime.now(tz=UTC) - timedelta(minutes=settings.search_refresh_interval)
+            < last_search_time
+        )
+
     def _can_movie_be_searched(self, movie: arr_client.MovieModel):
         if not self.radarr:
             logger.info("Radarr is not configured. Skipping...")
@@ -68,10 +74,8 @@ class Upgraderr:
         elif not movie.is_released():
             logger.debug(f"Skipping unreleased movie ({movie.title})")
             return False
-        elif (
-            movie.lastSearchTime
-            and datetime.now() - timedelta(minutes=settings.search_refresh_interval)
-            < movie.lastSearchTime
+        elif movie.lastSearchTime and self._was_media_recently_searched(
+            last_search_time=movie.lastSearchTime
         ):
             logger.debug(f"Skipping recently search episode ({movie.title})")
             return False
@@ -123,10 +127,8 @@ class Upgraderr:
                 f"Skipping unreleased episode ({series.title} - {episode.title})"
             )
             return False
-        elif (
-            episode.lastSearchTime
-            and datetime.now() - timedelta(minutes=settings.search_refresh_interval)
-            < episode.lastSearchTime
+        elif episode.lastSearchTime and self._was_media_recently_searched(
+            last_search_time=episode.lastSearchTime
         ):
             logger.debug(
                 f"Skipping recently search episode ({series.title} - {episode.title})"

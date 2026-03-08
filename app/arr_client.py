@@ -1,7 +1,7 @@
 import cachetools
 import requests
 import time
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, UTC
 from pydantic import BaseModel
 from app.settings import settings
 from typing import TypeVar, Generic, Literal
@@ -51,13 +51,13 @@ class EpisodeModel(BaseModel):
     episodeFileId: int
     hasFile: bool
     monitored: bool
-    airDate: date | None = None
+    airDateUtc: datetime | None = None
     lastSearchTime: datetime | None = None
     title: str
     id: int
 
     def is_released(self):
-        return datetime.now().date() >= self.airDate if self.airDate else False
+        return datetime.now(tz=UTC) >= self.airDateUtc if self.airDateUtc else False
 
 
 class SeriesModel(BaseModel):
@@ -186,7 +186,7 @@ class MovieModel(BaseModel):
     id: int
 
     def is_released(self):
-        return datetime.now() >= self.releaseDate if self.releaseDate else False
+        return datetime.now(tz=UTC) >= self.releaseDate if self.releaseDate else False
 
 
 class MovieFileModel(BaseModel):
