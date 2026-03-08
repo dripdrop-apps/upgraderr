@@ -236,6 +236,7 @@ class Upgraderr:
             and release.rejections[0].startswith(
                 "Existing file on disk has a equal or higher Custom Format score"
             )
+            and release.fullSeason
         )
 
     def search_season(self, media_search: SeasonSearch):
@@ -277,7 +278,6 @@ class Upgraderr:
                     r
                     for r in releases
                     if self.is_qualified_release(media_search=media_search, release=r)
-                    and r.fullSeason
                 ),
                 None,
             )
