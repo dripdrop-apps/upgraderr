@@ -20,7 +20,13 @@ class ArrClient(Generic[T], requests.Session):
             self.headers.update({"X-Api-Key": api_key})
 
     def request(self, method: str, url: str, *args, **kwargs):
-        response = super().request(method, f"{self.base_url}{url}", *args, **kwargs)
+        response = super().request(
+            method,
+            f"{self.base_url}{url}",
+            *args,
+            **kwargs,
+            timeout=COMMAND_TIMEOUT * 60,
+        )
         response.raise_for_status()
         return response
 
