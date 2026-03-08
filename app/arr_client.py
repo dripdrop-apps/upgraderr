@@ -1,17 +1,20 @@
+import cachetools
 import requests
 import time
 from datetime import datetime, timedelta, date
-from functools import lru_cache
 from pydantic import BaseModel
 from app.settings import settings
 from typing import TypeVar, Generic, Literal
 
 T = TypeVar("T")
 
+COMMAND_TIMEOUT = 10
+
 
 class ArrClient(Generic[T], requests.Session):
     def __init__(self, url: str, api_key: str | None = None):
         super().__init__()
+        self.cache = cachetools.Cache(maxsize=120)
         self.base_url = url
         if api_key:
             self.headers.update({"X-Api-Key": api_key})
@@ -108,8 +111,8 @@ class SonarrClient(ArrClient):
             None,
         )
 
-    @lru_cache()
-    def get_episode_files(self, series_id: str):
+    @cachetools.cachedmethod(cache=lambda self: self.cache)
+    def get_episode_files(self, series_id: int):
         response = self.get(
             "/api/v3/episodeFile",
             params={"seriesId": series_id},
@@ -123,16 +126,10 @@ class SonarrClient(ArrClient):
             None,
         )
 
-    def get_queue_details_for_series(self, series_id: int):
-        response = self.get("/api/v3/queue/details", params={"seriesId": series_id})
-        return [EpisodeDetailModel.model_validate(_) for _ in response.json()]
-
-    @lru_cache()
     def get_all_series(self):
         response = self.get("/api/v3/series")
         return [SeriesModel.model_validate(_) for _ in response.json()]
 
-    @lru_cache()
     def get_all_episodes(self, series_id: int):
         response = self.get("/api/v3/episode", params={"seriesId": series_id})
         return [EpisodeModel.model_validate(_) for _ in response.json()]
@@ -160,7 +157,7 @@ class SonarrClient(ArrClient):
 
     def wait_for_command(self, command_id: int):
         start_time = datetime.now()
-        while datetime.now() - start_time < timedelta(minutes=5):
+        while datetime.now() - start_time < timedelta(minutes=COMMAND_TIMEOUT):
             command_status = self.get_command_status(id=command_id)
             if command_status.status == "completed":
                 return command_status.message
@@ -226,7 +223,6 @@ class RadarrClient(ArrClient):
             (movie_file.customFormatScore for movie_file in movie_files), default=None
         )
 
-    @lru_cache()
     def get_all_movies(self):
         response = self.get("/api/v3/movie")
         return [MovieModel.model_validate(_) for _ in response.json()]
@@ -243,7 +239,7 @@ class RadarrClient(ArrClient):
 
     def wait_for_command(self, command_id: int):
         start_time = datetime.now()
-        while datetime.now() - start_time < timedelta(minutes=5):
+        while datetime.now() - start_time < timedelta(minutes=COMMAND_TIMEOUT):
             command_status = self.get_command_status(id=command_id)
             if command_status.status == "completed":
                 return command_status.message
