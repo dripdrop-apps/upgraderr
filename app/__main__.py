@@ -4,6 +4,7 @@ import logging.handlers
 import random
 import sys
 import time
+from datetime import datetime, timedelta
 from typing import NamedTuple
 from app import arr_client
 from app.notifications import send_search_notification
@@ -66,6 +67,14 @@ class Upgraderr:
             return False
         elif not movie.is_released():
             logger.debug(f"Skipping unreleased movie ({movie.title})")
+            return False
+        elif (
+            movie.lastSearchTime
+            and datetime.now() - timedelta(minutes=settings.search_state_reset)
+            < movie.lastSearchTime
+        ):
+            logger.debug(f"Skipping recently search episode ({movie.title})")
+            return False
 
         movie_custom_format_score = self.radarr.get_movie_custom_format_score(
             movie_id=movie.id
@@ -113,6 +122,16 @@ class Upgraderr:
             logger.debug(
                 f"Skipping unreleased episode ({series.title} - {episode.title})"
             )
+            return False
+        elif (
+            episode.lastSearchTime
+            and datetime.now() - timedelta(minutes=settings.search_state_reset)
+            < episode.lastSearchTime
+        ):
+            logger.debug(
+                f"Skipping recently search episode ({series.title} - {episode.title})"
+            )
+            return False
 
         episode_custom_format_score = self.sonarr.get_episode_custom_format_score(
             episode_file_id=episode.episodeFileId, series_id=episode.seriesId
