@@ -4,10 +4,7 @@ import logging.handlers
 import random
 import sys
 import time
-from datetime import datetime, timedelta, UTC
-from typing import NamedTuple
-from app.arr.radarr import MovieModel, RadarrClient
-from app.arr.sonarr import EpisodeModel, EpisodeReleaseModel, SeriesModel, SonarrClient
+from app.arr import radarr, sonarr
 from app.notifications import send_search_notification, apprise
 from app.settings import settings
 
@@ -29,311 +26,103 @@ logger.setLevel(level=settings.log_level)
 
 
 def log_and_notify(message: str, level=apprise.NotifyType.INFO):
-    logger.info(message)
+    log_level = logging.INFO
+    if level == apprise.NotifyType.FAILURE:
+        log_level = logging.ERROR
+    elif level == apprise.NotifyType.WARNING:
+        log_level = logging.WARNING
+
+    logger.log(level=log_level, msg=message)
     send_search_notification(body=message, level=level)
-
-
-class MovieSearch(NamedTuple):
-    movie_id: int
-    movie_title: str
-
-    def __str__(self):
-        return f"Movie: {self.movie_title}"
-
-
-class SeasonSearch(NamedTuple):
-    series_id: int
-    series_title: str
-    season_number: int
-    episode_custom_format_score: int | None
-
-    def __str__(self) -> str:
-        return f"Series: {self.series_title} S{self.season_number:02}"
 
 
 class Upgraderr:
     def __init__(self):
-        self.sonarr = SonarrClient.initialize()
-        self.radarr = RadarrClient.initialize()
+        self.sonarr = sonarr.SonarrClient.initialize()
+        self.radarr = radarr.RadarrClient.initialize()
         self.dry_run = settings.dry_run
         if self.dry_run:
             logger.info("DRY RUN: No searches will be executed.")
 
-    def _was_media_recently_searched(self, last_search_time: datetime):
-        return (
-            datetime.now(tz=UTC) - timedelta(minutes=settings.search_refresh_interval)
-            < last_search_time
-        )
-
-    def _can_movie_be_searched(self, movie: MovieModel):
+    def get_movie_searches(self):
+        searchable_movies = list[radarr.MovieModel]()
         if not self.radarr:
             logger.info("Radarr is not configured. Skipping...")
-            return False
-        elif not movie.monitored:
-            logger.debug(f"Skipping unmonitored movie ({movie.title})")
-            return False
-        elif not movie.is_released():
-            logger.debug(f"Skipping unreleased movie ({movie.title})")
-            return False
-        elif movie.lastSearchTime and self._was_media_recently_searched(
-            last_search_time=movie.lastSearchTime
-        ):
-            logger.debug(f"Skipping recently search episode ({movie.title})")
-            return False
-
-        movie_custom_format_score = self.radarr.get_movie_custom_format_score(
-            movie_id=movie.id
-        )
-        profile_max_custom_score = self.radarr.get_quality_profile_custom_format_score(
-            quality_profile_id=movie.qualityProfileId
-        )
-
-        movie_can_be_upgraded = (
-            movie.hasFile
-            and isinstance(movie_custom_format_score, int)
-            and isinstance(profile_max_custom_score, int)
-            and movie_custom_format_score < profile_max_custom_score
-        )
-        if movie_can_be_upgraded:
-            logger.debug(f"Movie ({movie.title}) can be upgraded.")
-            logger.debug(
-                f"Current score: {movie_custom_format_score}, Max score: {profile_max_custom_score}"
-            )
-        if not movie.hasFile:
-            logger.debug(f"Movie ({movie.title}) does not have a file.")
-        return movie_can_be_upgraded or not movie.hasFile
-
-    def get_movies(self):
-        if not self.radarr:
-            logger.debug("Radarr is not configured. Skipping...")
-            return []
-
-        logger.debug("Retrieving movies from radarr...")
+            return searchable_movies
         movies = self.radarr.get_all_movies()
-        logger.info(f"Successfully retrieved {len(movies)} movies.")
-        return movies
+        logger.info(f"Successfully retrieved {len(movies)} movies")
+        for m in movies:
+            check = m.can_be_searched()
+            if check.should_search:
+                logger.debug(f"Movie {m} is searchable. Reason: {check.reason}")
+                searchable_movies.append(m)
+            else:
+                logger.debug(f"Skipping movie: {m}. Reason: {check.reason}")
+        return searchable_movies
 
-    def _can_episode_be_searched(self, series: SeriesModel, episode: EpisodeModel):
-        if not self.sonarr:
-            return False
-        elif not episode.monitored:
-            logger.debug(
-                f"Skipping unmonitored episode ({series.title} - {episode.title})"
-            )
-            return False
-        elif not episode.is_released():
-            logger.debug(
-                f"Skipping unreleased episode ({series.title} - {episode.title})"
-            )
-            return False
-        elif episode.lastSearchTime and self._was_media_recently_searched(
-            last_search_time=episode.lastSearchTime
-        ):
-            logger.debug(
-                f"Skipping recently search episode ({series.title} - {episode.title})"
-            )
-            return False
-
-        episode_custom_format_score = self.sonarr.get_episode_custom_format_score(
-            episode_file_id=episode.episodeFileId, series_id=episode.seriesId
-        )
-        profile_max_custom_format_score = (
-            self.sonarr.get_quality_profile_custom_format_score(
-                quality_profile_id=series.qualityProfileId,
-            )
-        )
-        episode_can_be_upgraded = (
-            episode.hasFile
-            and isinstance(episode_custom_format_score, int)
-            and isinstance(profile_max_custom_format_score, int)
-            and episode_custom_format_score < profile_max_custom_format_score
-        )
-        if episode_can_be_upgraded:
-            logger.debug(f"Episode ({series.title} - {episode.title}) can be upgraded.")
-            logger.debug(
-                f"Current Score {episode_custom_format_score}, Max Score {profile_max_custom_format_score}"
-            )
-        if not episode.hasFile:
-            logger.debug(f"Episode ({series.title} - {episode.title}) has no file.")
-        return episode_can_be_upgraded or not episode.hasFile
-
-    def get_all_series(self):
+    def get_season_searches(self):
+        searchable_seasons = list[sonarr.SeasonModel]()
         if not self.sonarr:
             logger.debug("Sonarr is not configured. Skipping...")
-            return []
-        logger.debug("Retrieving episodes from sonarr...")
+            return searchable_seasons
         all_series = self.sonarr.get_all_series()
-        count = 0
+        episodes_count = 0
         for series in all_series:
-            series_id = series.id
-            series.episodes = self.sonarr.get_all_episodes(series_id=series_id)
-            count += len(series.episodes)
-        logger.info(
-            f"Successfully retrieved {count} episodes from {len(all_series)} series."
-        )
-        return all_series
-
-    def get_movie_searches(self, movies: list[MovieModel]):
-        movies_to_search = list[MovieSearch]()
-        if not self.radarr:
-            logger.debug("Radarr is not configured. Skipping...")
-            return movies_to_search
-        return [
-            MovieSearch(movie_id=m.id, movie_title=m.title)
-            for m in movies
-            if self._can_movie_be_searched(movie=m)
-        ]
-
-    def get_season_searches(self, all_series: list[SeriesModel]):
-        seasons_to_search = set[SeasonSearch]()
-
-        if not self.sonarr:
-            logger.debug("Sonarr is not configured. Skipping...")
-            return list(seasons_to_search)
-
-        for series in all_series:
-            for episode in series.episodes:
-                if self._can_episode_be_searched(series=series, episode=episode):
-                    seasons_to_search.add(
-                        SeasonSearch(
-                            series_id=series.id,
-                            series_title=series.title,
-                            season_number=episode.seasonNumber,
-                            episode_custom_format_score=self.sonarr.get_episode_custom_format_score(
-                                series_id=series.id,
-                                episode_file_id=episode.episodeFileId,
-                            ),
-                        )
+            for season in series.seasons:
+                check = season.can_be_searched()
+                if check.should_search:
+                    logger.debug(
+                        f"Season {season} is searchable. Reason: {check.reason}"
                     )
-        return list(seasons_to_search)
-
-    def search_movie(self, media_search: MovieSearch):
-        if not self.radarr:
-            return
-        command = self.radarr.search_movie(movie_ids=[media_search.movie_id])
-        logger.info(f"Triggering search for {media_search}")
-        try:
-            result = self.radarr.wait_for_command(command_id=command.id)
-            log_and_notify(
-                message=f"Triggered search for {media_search}\nResult: {result}"
-            )
-        except Exception:
-            log_and_notify(
-                message=f"Timed out waiting for command for {media_search}",
-                level=apprise.NotifyType.FAILURE,
-            )
-
-    def is_qualified_release(
-        self, media_search: SeasonSearch, release: EpisodeReleaseModel
-    ):
-        if release.approved:
-            return True
-        return (
-            isinstance(media_search.episode_custom_format_score, int)
-            and release.customFormatScore > media_search.episode_custom_format_score
-            and len(release.rejections) == 1
-            and release.rejections[0].startswith(
-                "Existing file on disk has a equal or higher Custom Format score"
-            )
-            and release.fullSeason
+                else:
+                    logger.debug(
+                        f"Skipping season: {season}. Reason: No upgradable episode"
+                    )
+                episodes_count += len(season.episodes)
+        logger.info(
+            f"Successfully retrieved {len(all_series)} series with {episodes_count} episodes"
         )
+        return searchable_seasons
 
-    def search_season(self, media_search: SeasonSearch):
-        if not self.sonarr:
-            return
-        if settings.sonarr_search == "command":
-            command = self.sonarr.search_season(
-                series_id=media_search.series_id,
-                season_number=media_search.season_number,
-            )
-            logger.info(f"Triggering search for {media_search}")
-            try:
-                result = self.sonarr.wait_for_command(command_id=command.id)
-                log_and_notify(
-                    message=f"Triggered search for {media_search}\nResult: {result}"
-                )
-            except Exception:
-                log_and_notify(
-                    message=f"Timed out waiting for command for {media_search}",
-                    level=apprise.NotifyType.FAILURE,
-                )
-        elif settings.sonarr_search == "release":
-            logger.info(f"Grabbing releases for {media_search}")
-            try:
-                releases = self.sonarr.get_releases(
-                    series_id=media_search.series_id,
-                    season_number=media_search.season_number,
-                )
-            except Exception:
-                logger.info(f"Failed to get releases for {media_search}", exc_info=True)
-                log_and_notify(
-                    message=f"Attempted to grab releases for {media_search} but failed",
-                    level=apprise.NotifyType.FAILURE,
-                )
-                return
-
-            qualified_release = next(
-                (
-                    r
-                    for r in releases
-                    if self.is_qualified_release(media_search=media_search, release=r)
-                ),
-                None,
-            )
-            if not qualified_release:
-                logger.info(f"No qualified release found for {media_search}")
-                return
-            try:
-                self.sonarr.grab_release(
-                    guid=qualified_release.guid,
-                    indexerId=qualified_release.indexerId,
-                )
-                log_and_notify(
-                    message=f"Grabbed release for {media_search}\nRelease Name: {qualified_release.title}"
-                )
-            except Exception:
-                log_and_notify(
-                    message=f"Failed to grab release for {media_search}\nRelease Name: {qualified_release.title}",
-                    level=apprise.NotifyType.FAILURE,
-                )
-
-    @classmethod
-    def search(cls):
-        upgraderr = cls()
+    def search(self):
         logger.info("Starting media search")
 
-        movies = upgraderr.get_movies()
-        all_series = upgraderr.get_all_series()
-
-        searches = list[MovieSearch | SeasonSearch]()
+        searchable_media = list[sonarr.SeasonModel | radarr.MovieModel]()
+        searchable_media.extend(self.get_movie_searches())
+        searchable_media.extend(self.get_season_searches())
         searches_triggered = 0
 
-        searches.extend(upgraderr.get_movie_searches(movies=movies))
-        searches.extend(upgraderr.get_season_searches(all_series=all_series))
-        random.shuffle(searches)
+        random.shuffle(searchable_media)
 
-        logger.debug(f"Found {len(searches)} searches to trigger")
+        logger.debug(f"Found {len(searchable_media)} searches to trigger")
 
-        for media_search in searches[: settings.max_search_limit]:
-            if upgraderr.dry_run:
-                logger.info(f"DRY RUN: Skipping searching for {media_search}")
-            elif isinstance(media_search, MovieSearch) and upgraderr.radarr:
-                upgraderr.search_movie(media_search=media_search)
-            elif isinstance(media_search, SeasonSearch) and upgraderr.sonarr:
-                upgraderr.search_season(media_search=media_search)
+        for media in searchable_media[: settings.max_search_limit]:
+            if self.dry_run:
+                logger.info(
+                    f"DRY RUN: Skipping searching for {media.media_type}: {media}"
+                )
+            result = media.search()
+            log_and_notify(
+                message=result.message,
+                level=apprise.NotifyType.INFO
+                if result.success
+                else apprise.NotifyType.FAILURE,
+            )
             searches_triggered += 1
+
         logger.info(f"Media searching completed. Queued {searches_triggered} searches.")
 
     @classmethod
     def run(cls):
-        upgraderr = cls()
         while True:
+            upgraderr = cls()
             try:
                 upgraderr.search()
             except Exception as e:
                 logger.info(f"Error during search: {e}", exc_info=True)
             if settings.one_shot:
                 return
+            logger.info(f"Waiting {settings.search_interval} minutes for next run.")
             time.sleep(60 * settings.search_interval)
 
 
