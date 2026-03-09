@@ -79,7 +79,7 @@ class EpisodeModel(BaseModel):
         logger.debug(
             "\n".join(
                 [
-                    f"{self.title}",
+                    str(self),
                     f"Custom Format Score: {custom_format_score}, Profile Max Score: {profile_max_custom_score}",
                 ]
             )
