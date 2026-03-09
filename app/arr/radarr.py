@@ -1,12 +1,24 @@
+import logging
 import time
 from datetime import UTC, datetime, timedelta
 from pydantic import BaseModel
+from zoneinfo import ZoneInfo
 
-from app.arr.base import ArrClient, CommandStatus, QualityProfileModel, COMMAND_TIMEOUT
+from app.arr.base import (
+    ArrClient,
+    CommandStatus,
+    QualityProfileModel,
+    COMMAND_TIMEOUT,
+    SearchCheck,
+    SearchResult,
+)
 from app.settings import settings
+
+logger = logging.getLogger(__name__)
 
 
 class MovieModel(BaseModel):
+    client: "RadarrClient"
     tmdbId: int
     qualityProfileId: int
     hasFile: bool
@@ -16,8 +28,77 @@ class MovieModel(BaseModel):
     title: str
     id: int
 
-    def is_released(self):
+    def _is_released(self):
         return datetime.now(tz=UTC) >= self.releaseDate if self.releaseDate else False
+
+    def _is_recently_searched(self):
+        return (
+            bool(self.lastSearchTime)
+            and datetime.now(tz=UTC)
+            - timedelta(minutes=settings.search_refresh_interval)
+            < self.lastSearchTime
+        )
+
+    def _can_be_upgraded(self):
+        custom_format_score = self.client.get_movie_custom_format_score(
+            movie_id=self.id
+        )
+        if not custom_format_score:
+            return False
+        profile_max_custom_score = self.client.get_quality_profile_custom_format_score(
+            quality_profile_id=self.qualityProfileId
+        )
+        if not profile_max_custom_score:
+            return False
+        logger.debug(
+            "\n".join(
+                [
+                    f"{self.title}",
+                    f"Custom Format Score: {custom_format_score}, Profile Max Score: {profile_max_custom_score}",
+                ]
+            )
+        )
+        return custom_format_score < profile_max_custom_score
+
+    def _get_local_last_search_time(self):
+        return (
+            self.lastSearchTime.astimezone(tz=ZoneInfo("localtime"))
+            if self.lastSearchTime
+            else ""
+        )
+
+    def can_be_searched(self):
+        if not self.monitored:
+            return SearchCheck(reason="Unmonitored", should_search=False)
+        elif not self._is_released():
+            return SearchCheck(reason="Unreleased", should_search=False)
+        elif self._is_recently_searched():
+            return SearchCheck(
+                reason=f"Recently Searched at {self._get_local_last_search_time()}",
+                should_search=False,
+            )
+        elif not self.hasFile:
+            return SearchCheck(reason="Has no file", should_search=True)
+        elif self._can_be_upgraded():
+            return SearchCheck(reason="Can be upgraded", should_search=True)
+        return SearchCheck(reason="Can't be upgraded", should_search=False)
+
+    def search(self):
+        command = self.client.search_movie(movie_ids=[self.id])
+        logger.info(f"Trigger search for movie: {self.title}")
+        try:
+            result = self.client.wait_for_command(command_id=command.id)
+        except Exception:
+            return SearchResult(
+                message=f"Timed out waiting for command {command.id} for movie: {self.title}",
+                success=False,
+            )
+        return SearchResult(
+            message="\n".join(
+                [f"Triggered search for movie: {self.title}", f"Result: {result}"]
+            ),
+            success=True,
+        )
 
 
 class MovieFileModel(BaseModel):
@@ -56,7 +137,9 @@ class RadarrClient(ArrClient):
 
     def get_all_movies(self):
         response = self.get("/api/v3/movie")
-        return [MovieModel.model_validate(_) for _ in response.json()]
+        return [
+            MovieModel.model_validate({**_, "client": self}) for _ in response.json()
+        ]
 
     def search_movie(self, movie_ids: list[int]):
         response = self.post(

@@ -44,3 +44,13 @@ class CommandStatus(BaseModel):
     commandName: str
     message: str | None = None
     status: Literal["queued", "completed", "started"]
+
+
+class SearchCheck(BaseModel):
+    reason: str
+    should_search: bool
+
+
+class SearchResult(BaseModel):
+    message: str
+    success: bool
