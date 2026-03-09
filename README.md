@@ -2,11 +2,11 @@
 
 ## Intro
 
-After the whole `Huntarr` fallout, I realized I missed the functionality of a service like it that would constantly search for and upgrade my media in `Sonarr` and `Radarr`. There are scripts like [upgradinatorr](https://github.com/angrycuban13/Just-A-Bunch-Of-Starr-Scripts/blob/main/Upgradinatorr/README.md) that exists but I wanted something not written in powershell :lol: so I could understand it that and had a really easy docker setup. It did take some time to get a full grasp of how it works and to find where I felt improvements could be made, and so with that I wrote this little service up! I definitely avoided using any AI tooling when writing up this project so forgive me for any horrendous code you find.
+After the whole `Huntarr` fallout, I realized I missed the functionality of a service like it that would constantly search for and upgrade my media in `Sonarr` and `Radarr`. There are scripts like [upgradinatorr](https://github.com/angrycuban13/Just-A-Bunch-Of-Starr-Scripts/blob/main/Upgradinatorr/README.md) and [daps](https://github.com/Drazzilb08/daps) that exists, so it may suit you better, but I wanted to customize the approach for searching a little bit more. One major difference between my script compared to `daps` is the way that `sonarr` searches are performed.
 
 ## How does it work ?
 
-By just defining your `Arr` apps `Upgraderr` will synchronize your media state to it's database and attempt to trigger indexer searches based on the following decision tree:
+By just defining your `Arr` apps `Upgraderr` will retrieve all of your media and attempt to trigger indexer searches based on the following decision tree:
 
 ```mermaid
 graph TD;
@@ -22,6 +22,18 @@ graph TD;
 ## Why do I even need this?
 
 I noticed a lot of people never really understood the want for this kind of application and to be fair it is catered to a really specific want that the `Arr` apps don't fulfill. `Arr` apps perform full indexer searches when clicking on a button from their UI or from applications like `Seerr` when requesting media. But once an Episode or Season from a Series is added, after the initial search, the `Arr` apps rely purely on RSS Feeds for searching. So if you ever join a new tracker or if you missed a release due to rate-limiting from an indexer, there's a good chance you missed a high quality media file. This script aims to solve that by periodically triggering full searches for your media items.
+
+## Searching
+
+`Upgraderr` runs in intervals of `SEARCH_INTERVAL` minutes and attempts to search `MAX_SEARCH_LIMIT` items in a single run.
+
+### Radarr
+
+The way that searches are performed in `Radarr` are very much like any other script listed above, which is simply sending a search command to `Radarr` and allowing to pick the best release based on what you have defined in your instance.
+
+### Sonarr
+
+There are two approaches that are utilized in `Sonarr`, the first is using search commands. It works slightly different in that for `Sonarr`, if it doesn't find an appropriate season release, it will attempt to individually look through episodes that can be upgraded and trigger search tasks for them. One thing that this script will do is to avoid the possibility of single episode searches by performing a manual season and getting the best season release that would improve at least one episode within the season. You can enable this option by simply setting `SONARR_SEARCH` to `release`. I preferred this approach since it kept the viewing experience for seasons to be uniform since they would all be from the same release group.
 
 ## Configuration
 
