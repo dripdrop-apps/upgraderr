@@ -10,7 +10,7 @@ By just defining your `Arr` apps `Upgraderr` will synchronize your media state t
 
 ```mermaid
 graph TD;
-    A[Movie/Episode] --> B{Is Monitored?}
+    A[Movie/Season] --> B{Is Monitored?}
     B -- Yes --> C{Is Missing?}
     B -- No --> D[Skip]
     C -- Yes --> E[Trigger Search]
