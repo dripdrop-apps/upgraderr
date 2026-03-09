@@ -27,21 +27,21 @@ I noticed a lot of people never really understood the want for this kind of appl
 
 These are the different environment variables that can be configured:
 
-| Variable                  | Description                                                                                                                                                                                    |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SONARR_URL`              | The URL of your Sonarr instance                                                                                                                                                                |
-| `SONARR_API_KEY`          | The API key for your Sonarr instance                                                                                                                                                           |
-| `RADARR_URL`              | The URL of your Radarr instance                                                                                                                                                                |
-| `RADARR_API_KEY`          | The API key for your Radarr instance                                                                                                                                                           |
-| `DRY_RUN`                 | If set to `true ` the script will not trigger any searches                                                                                                                                     |
-| `LOG_LEVEL`               | The log level for the script                                                                                                                                                                   |
-| `LOGS_DIRECTORY`          | The directory where the logs are stored                                                                                                                                                        |
-| `MAX_SEARCH_LIMIT`        | The maximum number of searches that can be triggered in a single run                                                                                                                           |
-| `NOTIFICATION_URL`        | An Apprise URL for notifications                                                                                                                                                               |
-| `ONE_SHOT`                | If set to `true` the script will run once and then exit                                                                                                                                        |
-| `SEARCH_INTERVAL`         | The interval (in minutes) between searches                                                                                                                                                     |
-| `SEARCH_REFRESH_INTERVAL` | The interval (in minutes) after which a media item will be searched again                                                                                                                      |
-| `SONARR_SEARCH`           | The type of search that will be performed for a season. `command` is the same as clicking on search in sonarr. `release` attempts to run an interactive search and picks the best season pack. |
+| Variable                  | Default   | Description                                                                                                                                                                                    |
+| ------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SONARR_URL`              | `none`    | The URL of your Sonarr instance                                                                                                                                                                |
+| `SONARR_API_KEY`          | `none`    | The API key for your Sonarr instance                                                                                                                                                           |
+| `RADARR_URL`              | `none`    | The URL of your Radarr instance                                                                                                                                                                |
+| `RADARR_API_KEY`          | `none`    | The API key for your Radarr instance                                                                                                                                                           |
+| `DRY_RUN`                 | `true`    | If set to `true ` the script will not trigger any searches                                                                                                                                     |
+| `LOG_LEVEL`               | `INFO`    | The log level for the script, either `INFO` or `DEBUG`                                                                                                                                         |
+| `LOGS_DIRECTORY`          | `/logs`   | The directory where the logs are stored                                                                                                                                                        |
+| `MAX_SEARCH_LIMIT`        | `20`      | The maximum number of searches that can be triggered in a single run                                                                                                                           |
+| `NOTIFICATION_URL`        | `none`    | An Apprise URL for notifications                                                                                                                                                               |
+| `ONE_SHOT`                | `false`   | If set to `true` the script will run once and then exit                                                                                                                                        |
+| `SEARCH_INTERVAL`         | `5`       | The interval (in minutes) between searches                                                                                                                                                     |
+| `SEARCH_REFRESH_INTERVAL` | `84600`   | The interval (in minutes) after which a media item will be searched again                                                                                                                      |
+| `SONARR_SEARCH`           | `command` | The type of search that will be performed for a season. `command` is the same as clicking on search in sonarr. `release` attempts to run an interactive search and picks the best season pack. |
 
 ## Notifications
 

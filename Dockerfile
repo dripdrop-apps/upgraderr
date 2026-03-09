@@ -14,7 +14,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 RUN chmod +x /app/upgraderr && ln -s /app/upgraderr /usr/local/bin/upgraderr
 
-RUN mkdir /data && mkdir /logs
+RUN mkdir /logs
 
 CMD [ "run" ]
 
