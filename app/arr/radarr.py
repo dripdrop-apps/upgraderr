@@ -1,8 +1,7 @@
 import logging
 import time
 from datetime import UTC, datetime, timedelta
-from pydantic import BaseModel
-from zoneinfo import ZoneInfo
+from pydantic import BaseModel, ConfigDict
 
 from app.arr.base import (
     ArrClient,
@@ -18,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 class MovieModel(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     client: "RadarrClient"
     tmdbId: int
     qualityProfileId: int
@@ -27,7 +28,6 @@ class MovieModel(BaseModel):
     lastSearchTime: datetime | None = None
     title: str
     id: int
-    media_type = "movie"
 
     def _is_released(self):
         return datetime.now(tz=UTC) >= self.releaseDate if self.releaseDate else False
@@ -62,11 +62,7 @@ class MovieModel(BaseModel):
         return custom_format_score < profile_max_custom_score
 
     def _get_local_last_search_time(self):
-        return (
-            self.lastSearchTime.astimezone(tz=ZoneInfo("localtime"))
-            if self.lastSearchTime
-            else ""
-        )
+        return self.lastSearchTime.astimezone() if self.lastSearchTime else ""
 
     def can_be_searched(self):
         if not self.monitored:

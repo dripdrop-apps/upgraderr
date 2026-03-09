@@ -84,6 +84,17 @@ class Upgraderr:
         )
         return searchable_seasons
 
+    def get_media_type(
+        self, media: sonarr.SeasonModel | sonarr.EpisodeModel | radarr.MovieModel
+    ):
+        if isinstance(media, sonarr.SeasonModel):
+            return "season"
+        elif isinstance(media, sonarr.EpisodeModel):
+            return "episode"
+        elif isinstance(media, radarr.MovieModel):
+            return "movie"
+        return "unknown"
+
     def search(self):
         logger.info("Starting media search")
 
@@ -99,7 +110,7 @@ class Upgraderr:
         for media in searchable_media[: settings.max_search_limit]:
             if self.dry_run:
                 logger.info(
-                    f"DRY RUN: Skipping searching for {media.media_type}: {media}"
+                    f"DRY RUN: Skipping searching for {self.get_media_type(media)}: {media}"
                 )
             result = media.search()
             log_and_notify(

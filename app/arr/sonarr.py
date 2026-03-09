@@ -2,8 +2,7 @@ from collections import defaultdict
 import logging
 import time
 from datetime import UTC, datetime, timedelta
-from pydantic import BaseModel, computed_field
-from zoneinfo import ZoneInfo
+from pydantic import BaseModel, computed_field, ConfigDict
 
 from app.arr.base import (
     COMMAND_TIMEOUT,
@@ -41,6 +40,8 @@ class EpisodeReleaseModel(BaseModel):
 
 
 class EpisodeModel(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     client: "SonarrClient"
     tvdbId: int
     seriesId: int
@@ -87,11 +88,7 @@ class EpisodeModel(BaseModel):
         return custom_format_score < profile_max_custom_score
 
     def _get_local_last_search_time(self):
-        return (
-            self.lastSearchTime.astimezone(tz=ZoneInfo("localtime"))
-            if self.lastSearchTime
-            else ""
-        )
+        return self.lastSearchTime.astimezone() if self.lastSearchTime else ""
 
     def can_be_searched(self, series: "SeriesModel"):
         if not self.monitored:
@@ -114,11 +111,12 @@ class EpisodeModel(BaseModel):
 
 
 class SeasonModel(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     client: "SonarrClient"
     series: "SeriesModel"
     seasonNumber: int
     episodes: list[EpisodeModel]
-    media_type = "season"
 
     def can_be_searched(self):
         for episode in self.episodes:
@@ -223,10 +221,12 @@ class SeasonModel(BaseModel):
         return self._search_by_release()
 
     def __str__(self) -> str:
-        return f"{self.series.title} S{self.seasonNumber:2}"
+        return f"{self.series.title} S{self.seasonNumber:02}"
 
 
 class SeriesModel(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     client: "SonarrClient"
     title: str
     monitored: bool
@@ -235,9 +235,9 @@ class SeriesModel(BaseModel):
 
     @computed_field
     @property
-    def seasons(self):
+    def seasons(self) -> list[SeasonModel]:
         episodes = self.client.get_all_episodes(series_id=self.id)
-        season_map = defaultdict[int, list[EpisodeModel]]()
+        season_map = defaultdict[int, list[EpisodeModel]](list)
         for e in episodes:
             season_map[e.seasonNumber].append(e)
         return [
