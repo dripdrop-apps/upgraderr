@@ -27,6 +27,7 @@ class MovieModel(BaseModel):
     lastSearchTime: datetime | None = None
     title: str
     id: int
+    media_type = "movie"
 
     def _is_released(self):
         return datetime.now(tz=UTC) >= self.releaseDate if self.releaseDate else False
@@ -53,7 +54,7 @@ class MovieModel(BaseModel):
         logger.debug(
             "\n".join(
                 [
-                    f"{self.title}",
+                    str(self),
                     f"Custom Format Score: {custom_format_score}, Profile Max Score: {profile_max_custom_score}",
                 ]
             )
@@ -85,20 +86,23 @@ class MovieModel(BaseModel):
 
     def search(self):
         command = self.client.search_movie(movie_ids=[self.id])
-        logger.info(f"Trigger search for movie: {self.title}")
+        logger.debug(f"Trigger search for movie: {self}")
         try:
             result = self.client.wait_for_command(command_id=command.id)
         except Exception:
             return SearchResult(
-                message=f"Timed out waiting for command {command.id} for movie: {self.title}",
+                message=f"Timed out waiting for command {command.id} for movie: {self}",
                 success=False,
             )
         return SearchResult(
             message="\n".join(
-                [f"Triggered search for movie: {self.title}", f"Result: {result}"]
+                [f"Triggered search for movie: {self}", f"Result: {result}"]
             ),
             success=True,
         )
+
+    def __str__(self):
+        return self.title
 
 
 class MovieFileModel(BaseModel):
