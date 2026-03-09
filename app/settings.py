@@ -13,7 +13,6 @@ class Settings(BaseSettings):
     radarr_api_key: str | None = None
 
     dry_run: bool = True
-    data_directory: DirectoryPath = "/data"  # type: ignore
     log_level: str = "INFO"
     logs_directory: DirectoryPath = "/logs"  # type: ignore
     max_search_limit: int = 20
